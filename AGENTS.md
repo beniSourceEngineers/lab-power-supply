@@ -77,7 +77,12 @@ lab-power-supply/
 │                                support, linker files) for handwritten code only
 │
 ├── test/
-│   ├── host/                  ← host unit tests (IPC, glue logic) on PC
+│   ├── mocks/                 ← one mock per interface: MockSensor for ISensor, …
+│   ├── unit/                  ← host unit tests, one class under test, all
+│   │                            dependencies mocked
+│   ├── integration/           ← host integration tests: several real classes
+│   │                            together, hardware mocked at the HAL interfaces
+│   ├── target/                ← on-target integration tests (CCS test projects)
 │   └── back_to_back/          ← model vs. generated code vs. target comparison
 └── docs/
 ```
@@ -201,7 +206,9 @@ Every release of either project must state which versions built it.
     and `enum` inside a `struct` or `namespace` for scoping.
 - No exceptions, no RTTI, **no heap** (`new`/`malloc` are forbidden after init;
   preferably never). All objects are static.
-- Avoid virtual calls in ISRs; use templates/static polymorphism in hot paths.
+- Virtual calls are allowed (see *Interfaces* below). In the fast control ISR,
+  keep the number of virtual calls per cycle small and measure the ISR time.
+  Use templates only where a measurement shows that a virtual call is too slow.
 - **`char` is 16 bit** (`CHAR_BIT == 16`), and `sizeof` counts 16-bit words.
   Never assume byte layout, and there is no real 8-bit `uint8_t`. Use
   `uint16_t`/`uint32_t` in all shared and IPC structures.
@@ -210,8 +217,82 @@ Every release of either project must state which versions built it.
 - Section placement uses `#pragma DATA_SECTION("sec")` / `#pragma CODE_SECTION("sec")`,
   written immediately before the declaration (C++ form).
 - Time-critical functions run from RAM (`.TI.ramfunc`), copied at boot.
-- Naming: namespaces `hal::`, `ipc::`, `ctrl::`, `app::`. Files are
-  `snake_case.hpp/.cpp`, and types are `PascalCase`.
+- Naming: namespaces `hal::`, `ipc::`, `ctrl::`, `app::`, `comm::`. Types are
+  `PascalCase`, and each file has the name of the class it contains
+  (`Sensor.hpp`/`Sensor.cpp`).
+
+### Interfaces
+
+Classes that other classes depend on are reached through an **interface**:
+a pure abstract class whose name starts with `I`.
+
+| File | Contents |
+|---|---|
+| `ISensor.hpp` | Interface `ISensor`: pure virtual methods only, no data |
+| `Sensor.hpp` / `Sensor.cpp` | Implementation `class Sensor : public ISensor` |
+| `test/mocks/MockSensor.hpp` | Mock `class MockSensor : public ISensor` |
+
+A pure interface has no code, so it only needs a header. Add an `ISensor.cpp`
+only if the interface ever gets code.
+
+```cpp
+// ISensor.hpp
+#ifndef HAL_ISENSOR_HPP
+#define HAL_ISENSOR_HPP
+
+namespace hal {
+
+class ISensor {
+public:
+    virtual float read() const = 0;
+    virtual bool  isValid() const = 0;
+
+protected:
+    // Protected, non-virtual: objects are never deleted through the interface
+    // (no heap), so the compiler does not generate deleting destructors and
+    // operator delete is not linked.
+    ~ISensor() {}
+};
+
+} // namespace hal
+
+#endif
+```
+
+Rules:
+
+- Depend on interfaces, not implementations. Dependencies are passed as
+  **references in the constructor** (dependency injection). There are no
+  singletons and no global access from inside classes.
+- Only the composition root (`main.cpp` of each core) knows the concrete
+  classes. It creates them as static objects and wires them together.
+- Interfaces live next to their implementation in the same namespace. Shared
+  interfaces (IPC, shared types) live in `ccs/common/`.
+- Generated control code is wrapped by a class behind an interface too
+  (`ctrl::ICurrentLoop` → `ctrl::CurrentLoop`, which calls the generated C).
+  This lets the application be tested with a mocked controller.
+- Not every class needs an interface. Value types, message structs and
+  small helpers without hardware or dependencies do not.
+
+### Tests
+
+- **Every interface has a mock** in `test/mocks/` (`MockSensor` for `ISensor`).
+  Unit and integration tests use these mocks for every dependency they do not
+  test.
+- **Unit tests** (`test/unit/`): one class under test, all dependencies mocked.
+  File name `<Class>Test.cpp`, e.g. `SensorTest.cpp`.
+- **Integration tests** (`test/integration/`): several real classes wired
+  together (e.g. state machine + protection + controller wrapper + generated
+  control code). Hardware is mocked at the HAL interfaces (`IAdc`, `IPwm`, …).
+- Host tests are built with CMake and run on the PC with **GoogleTest/GoogleMock**.
+  GoogleTest needs a newer C++ standard, so:
+  - only test code (`test/`) may use newer C++,
+  - the production code is additionally compiled on the host with
+    `-std=c++03 -pedantic` to catch C++11 features that slip in.
+- **On-target integration tests** (`test/target/`): CCS test projects for
+  driver, IPC and timing checks on the LaunchPad. Mocks used there must be
+  hand-written C++03 (no GoogleMock).
+- New or changed classes come with unit tests in the same PR.
 
 ### CLA (later step, not used now)
 
@@ -242,15 +323,29 @@ Planned design (`ccs/common/ipc/`):
 ```cpp
 namespace ipc {
 
-// Fixed-size typed channel in a message RAM section, one writer / one reader.
-// Consistency through a sequence counter (seqlock) or double buffer.
-template <typename T, uint16_t Flag>
-class Mailbox {
+// IMailboxWriter.hpp / IMailboxReader.hpp: what application code depends on.
+template <typename T>
+class IMailboxWriter {
 public:
-    void post(const T& msg);          // writer core: copy + seq++ + set flag
-    bool tryRead(T& out);             // reader core: consistent copy if new
-    bool hasNew() const;
+    virtual void post(const T& msg) = 0;   // copy + seq++ + set flag
+protected:
+    ~IMailboxWriter() {}
 };
+
+template <typename T>
+class IMailboxReader {
+public:
+    virtual bool tryRead(T& out) = 0;      // consistent copy if new
+    virtual bool hasNew() const = 0;
+protected:
+    ~IMailboxReader() {}
+};
+
+// Mailbox.hpp: fixed-size typed channel in a message RAM section, one writer /
+// one reader. Consistency through a sequence counter (seqlock) or double buffer.
+// Mocks: test/mocks/MockMailboxWriter.hpp, MockMailboxReader.hpp
+template <typename T, uint16_t Flag>
+class Mailbox : public IMailboxWriter<T>, public IMailboxReader<T> { /* ... */ };
 
 // Queue of fixed-size elements (ring buffer) for events/commands.
 template <typename T, uint16_t Size, uint16_t Flag>
@@ -269,8 +364,11 @@ void syncCores(uint16_t flag);        // boot-time handshake (IPC_sync)
   `STATIC_ASSERT(sizeof(T) == N)` check.
 - Section names and addresses are defined once, and both linker command files
   use them.
-- Unit tests for the protocols (seqlock, ring buffer) run on the host in
-  `test/host/`, with the register access replaced.
+- The IPC classes are reached through interfaces (`IMailboxWriter<T>`,
+  `IMailboxReader<T>`, `IQueue<T>`, `ICommandLink`), so application code can be
+  tested with mocks. Unit tests for the protocols
+  (seqlock, ring buffer) run on the host in `test/unit/`, with the register
+  access replaced.
 
 ---
 
@@ -285,7 +383,7 @@ Each phase ends with one PR. Each phase must keep both projects buildable.
 | 2 | **Partition the model** | Control algorithms extracted to `control/models/` with bus interfaces and data dictionary; `simulink_full/` references them; behaviour equal to Phase 1 (SIL/PIL back-to-back + target measurement) |
 | 3 | **Shared code generation** | `generate_control.m` gives deterministic code in `control/generated/`; interface (prototypes, memory sections) defined; Project A model-reference code equals `control/generated/` |
 | 4 | **CCS skeleton** | `ccs/cpu1`, `ccs/cpu2` projects in C++03 with driverlib, linker files, boot of CPU2, blinky + timer ISR on both cores |
-| 5 | **IPC library** | `ipc::Mailbox`, `Queue`, `CommandLink`, `syncCores`; host unit tests; target test with both cores exchanging data |
+| 5 | **IPC library** | IPC interfaces + `ipc::Mailbox`, `Queue`, `CommandLink`, `syncCores`; mocks; host unit tests; target test with both cores exchanging data |
 | 6 | **HAL + glue logic** | ADC/ePWM/CMPSS/trip-zone HAL, state machine, protection; open loop on hardware |
 | 7 | **Integrate control** | Generated control called from ISR/CLA through C++ wrappers; closed loop on hardware |
 | 8 | **Verification** | Back-to-back comparison Project A and Project B (same inputs give the same outputs); timing/CPU load compared with Phase 1 |
@@ -304,7 +402,9 @@ Each phase ends with one PR. Each phase must keep both projects buildable.
 - **CCS headless build** of `cpu1` and `cpu2` with the CCS 20 command line
   (`ccs-server-cli -noSplash -workspace <ws> -application com.ti.ccs.apps.buildProject -ccs.projects <name>`)
   with warnings treated as errors for handwritten code.
-- **Host unit tests** for `ccs/common/` (IPC protocol, utilities).
+- **Host unit and integration tests** (`test/unit/`, `test/integration/`) with
+  GoogleTest/GoogleMock, plus a host build of the production code with
+  `-std=c++03 -pedantic`.
 - **Back-to-back**: recorded input vectors run through the model (MIL), the
   generated code (SIL) and the target (PIL/HIL), and the outputs are compared
   within a tolerance.
@@ -339,4 +439,6 @@ Open:
   with …") to commits or PRs.
 - Do not edit `control/generated/` by hand.
 - Do not introduce C++11 or later features into `ccs/` (§5).
+- Use interfaces (`I<Name>`) for dependencies, and add a mock and unit tests for
+  every new interface and class (§5).
 - Treat `.slx`/`.sldd` files as binary. Describe model changes in the PR text.
