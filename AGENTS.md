@@ -173,14 +173,14 @@ synchronise with CPU2 at startup (`IPC_sync`).
 
 ## 4. Toolchain (pin exact versions in `toolchain.md`)
 
-- MATLAB/Simulink with Embedded Coder, C2000 Microcontroller Blockset, Fixed-Point Designer (if used)
+- MATLAB/Simulink **R2025b** with Embedded Coder and C2000 Microcontroller Blockset
 - Code Composer Studio (CCS)
 - TI C2000 Code Generation Tools (C28x compiler, which also compiles CLA code)
 - C2000Ware (driverlib, device support, linker command files): copied into
-  `ccs/ext/c2000ware/` for Project B only. **Proposed: 26.02.00.00 LTS**, not
-  yet confirmed; nothing is copied before confirmation.
-- C28x compiler version to match C2000Ware (TI states 25.11.1.LTS for
-  C2000Ware 26.02, to be verified)
+  `ccs/ext/c2000ware/` for Project B only. **Proposed: 5.02.00.00**, the
+  version MathWorks verifies for the R2025b blockset, so both projects use the
+  same version. Not yet confirmed; nothing is copied before confirmation.
+- C28x compiler 22.6.0.LTS and CCS 20.0.1, both verified for R2025b
 - Licensed CANopen stack (later), version to be recorded when it arrives
 - Hardware: LAUNCHXL-F28379D or the custom power stage board
 
@@ -317,14 +317,14 @@ Decided (2026-10-22):
 - Project A uses model reference for the control models.
 - C2000Ware is copied into the repo, for handwritten code only.
 - Communication runs on CPU2: SCI now, licensed CANopen stack later.
+- MATLAB R2025b Update 5 (see `toolchain.md`).
 
 Open:
 
-1. C2000Ware version: 26.02.00.00 LTS proposed, awaiting confirmation.
-2. MATLAB release and C2000 blockset version used for the existing model.
-   This fixes which C2000Ware and compiler Project A uses.
-3. Simulink models: to be supplied, then Phase 1 starts.
-4. CANopen stack: vendor, license terms (may it be committed?), C2000 port.
+1. C2000Ware 5.02.00.00 / C28x compiler 22.6.0.LTS / CCS 20.0.1: proposed, awaiting confirmation
+   (see `toolchain.md`).
+2. Simulink models: to be supplied, then Phase 1 starts.
+3. CANopen stack: vendor, license terms (may it be committed?), C2000 port.
 
 ---
 
