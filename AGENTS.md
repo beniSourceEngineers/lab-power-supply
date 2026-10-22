@@ -18,7 +18,8 @@ generated one**:
 |---|---|---|
 | Control algorithms | Simulink → generated C | Simulink → generated C (**unchanged, shared**) |
 | Peripherals (ADC, ePWM, GPIO, SCI, …) | C2000 blockset blocks | Handwritten C++03 on top of C2000Ware driverlib |
-| Scheduling / ISRs / state machine / glue logic | Simulink | Handwritten C++03 |
+| Scheduling / ISRs / glue logic | Simulink | Handwritten C++03 |
+| State machine | Stateflow → generated C | Two variants: generated Stateflow **or** handwritten C++03 FSM (§3.7) |
 | Inter-core communication (IPC) | IPC blocks | C++03 IPC abstraction (this repo) |
 | Build | Simulink "Build, Deploy & Start" | Code Composer Studio (CCS) projects |
 
@@ -43,7 +44,8 @@ lab-power-supply/
 ├── control/                   ← SHARED: single source of truth for control
 │   ├── models/                ← control models only (.slx), no hardware blocks
 │   │   ├── VoltageLoop.slx
-│   │   ├── CurrentLoop.slx
+│   │   ├── CurrentLoop.slx    ← incl. protection logic (runs at ~10 kHz)
+│   │   ├── StateMachine.slx   ← Stateflow state machine (§3.7)
 │   │   └── ...
 │   ├── data/                  ← Simulink data dictionary (.sldd): buses,
 │   │                            parameters, shared configuration set
@@ -146,13 +148,17 @@ Control lives only in `control/models/`, and its code only in
   driverlib, device headers/support, linker command files), and keep the
   license files.
 - The application layer covers the state machine (Off / Soft-start / CV / CC /
-  Fault), protection, setpoint handling, communication and HMI.
+  Fault; two variants, §3.7), setpoint handling, communication and HMI.
+- **Protection logic is part of the control models**, not the glue logic. It
+  must run at the same rate as the control loop (~10 kHz), so it is generated,
+  simulated and shared like the rest of the control. Hardware trips (CMPSS,
+  trip zone) are configured by the HAL as a fast backstop.
 
 ### 3.4 Core and CLA allocation (decided)
 
 | Unit | Responsibilities |
 |---|---|
-| CPU1 | System init, boot of CPU2, peripheral ownership hand-over, ADC/ePWM/CMPSS HAL, **all control loops**, protection/trip, state machine |
+| CPU1 | System init, boot of CPU2, peripheral ownership hand-over, ADC/ePWM/CMPSS HAL, **all control loops incl. protection (~10 kHz)**, hardware trip configuration, state machine |
 | CLA1 | **Not used for now.** Later step: move selected loops here (§7, Phase 10) |
 | CPU2 | **Communication**: SCI now, licensed CANopen stack later; command parsing, setpoints/limits to CPU1 via IPC, measurements/status from CPU1 |
 | CLA2 | Not used |
@@ -198,11 +204,33 @@ for model-in-the-loop (MIL) simulation of the whole power supply.
 - Simulink Test harnesses in `simulation/tests/` define the scenarios (start-up,
   load steps, CV/CC transitions, short circuit, ...). The recorded inputs and
   outputs are the reference vectors for the back-to-back comparison (§8).
-- **Gap:** the state machine and protection are Simulink in Project A but
-  handwritten C++ in Project B. A system simulation with only control + plant
-  does not cover them. Decide in Phase 2 whether supervisory decisions also
-  become a control model (then they are simulated and shared) or stay in the
-  glue logic (then they are tested with unit/integration tests only).
+- Protection is part of the control models, and the Stateflow state machine
+  is a referenced model too, so the system simulation covers control,
+  protection and state machine.
+
+### 3.7 State machine: two variants
+
+The state machine is modelled in **Stateflow** (`control/models/StateMachine.slx`).
+Project B explores two variants and compares them:
+
+| Variant | State machine | Built from |
+|---|---|---|
+| **B1** | Generated from the Stateflow model | `control/generated/StateMachine/`, same as Project A |
+| **B2** | Handwritten C++03 FSM framework | `ccs/cpu1/src/app/fsm/` |
+
+- Both variants implement the same interface `app::IStateMachine` (events in,
+  state and output commands out). The composition root (`main.cpp`) selects
+  the variant with a build configuration (CCS build configurations
+  `StateflowFsm` / `CppFsm`). The rest of the application does not change.
+- The Stateflow model is the **reference** for variant B2: the state machine
+  scenarios from `simulation/tests/` are replayed on the C++ FSM in host
+  integration tests (`test/integration/`), and the state sequence and outputs
+  must match.
+- The C++ FSM framework follows the coding rules (§5): C++03, no heap,
+  states and transitions as static objects, interfaces and mocks for its
+  dependencies.
+- The migration guide (Phase 9) compares both variants: readability, testing,
+  code size, execution time, and the effort to change behaviour.
 
 ---
 
@@ -312,8 +340,8 @@ Rules:
 - **Unit tests** (`test/unit/`): one class under test, all dependencies mocked.
   File name `<Class>Test.cpp`, e.g. `SensorTest.cpp`.
 - **Integration tests** (`test/integration/`): several real classes wired
-  together (e.g. state machine + protection + controller wrapper + generated
-  control code). Hardware is mocked at the HAL interfaces (`IAdc`, `IPwm`, …).
+  together (e.g. state machine (B1 or B2) + controller wrapper + generated
+  control code incl. protection). Hardware is mocked at the HAL interfaces (`IAdc`, `IPwm`, …).
 - Host tests are built with CMake and run on the PC with **GoogleTest/GoogleMock**.
   GoogleTest needs a newer C++ standard, so:
   - only test code (`test/`) may use newer C++,
@@ -415,9 +443,10 @@ Each phase ends with one PR. Each phase must keep both projects buildable.
 | 3 | **Shared code generation** | `generate_control.m` gives deterministic code in `control/generated/`; interface (prototypes, memory sections) defined; Project A model-reference code equals `control/generated/` |
 | 4 | **CCS skeleton** | `ccs/cpu1`, `ccs/cpu2` projects in C++03 with driverlib, linker files, boot of CPU2, blinky + timer ISR on both cores |
 | 5 | **IPC library** | IPC interfaces + `ipc::Mailbox`, `Queue`, `CommandLink`, `syncCores`; mocks; host unit tests; target test with both cores exchanging data |
-| 6 | **HAL + glue logic** | ADC/ePWM/CMPSS/trip-zone HAL, state machine, protection; open loop on hardware |
+| 6 | **HAL + glue logic** | ADC/ePWM/CMPSS/trip-zone HAL, `app::IStateMachine` with variant B1 (generated Stateflow); open loop on hardware |
+| 6a | **C++ FSM (variant B2)** | C++03 FSM framework + state machine; host tests replay the Stateflow scenarios; both variants selectable by build configuration |
 | 7 | **Integrate control** | Generated control called from ISR/CLA through C++ wrappers; closed loop on hardware |
-| 8 | **Verification** | Back-to-back comparison Project A and Project B (same inputs give the same outputs); timing/CPU load compared with Phase 1 |
+| 8 | **Verification** | Back-to-back comparison Project A and Project B, both FSM variants (same inputs give the same outputs); timing/CPU load compared with Phase 1 |
 | 9 | **Documentation** | Migration guide in `docs/`: steps, pitfalls, comparison of the workflows |
 | 10 | **CLA (later)** | Selected control loops moved to CLA1 in both projects; CLA-compatible code generation; back-to-back again |
 | 11 | **CANopen (later)** | Licensed CANopen stack on CPU2 behind the `comm::` interface; SCI stays as service/debug interface |
@@ -451,6 +480,9 @@ Decided (2026-10-22):
 - Project A uses model reference for the control models.
 - C2000Ware is copied into the repo, for handwritten code only.
 - Communication runs on CPU2: SCI now, licensed CANopen stack later.
+- Protection logic is part of the control models (~10 kHz).
+- State machine in Stateflow; Project B explores generated Stateflow (B1) and
+  a handwritten C++03 FSM (B2).
 - MATLAB R2025b Update 5, CCS 20.0.1, C28x compiler 22.6.0.LTS, C2000Ware
   5.02.00.00 for both projects (see `toolchain.md`).
 
@@ -458,8 +490,8 @@ Open:
 
 1. Simulink models: to be supplied, then Phase 1 starts.
 2. CANopen stack: vendor, license terms (may it be committed?), C2000 port.
-3. State machine / protection: part of a control model (simulated, shared) or
-   glue logic only (§3.6)? Decide in Phase 2.
+3. How the existing model is set up (protection inside the control models,
+   Stateflow chart, rates): to be checked when the models are supplied.
 4. Plant models: existing ones to be supplied, or built in Phase 2a?
 
 ---
