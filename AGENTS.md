@@ -174,13 +174,15 @@ synchronise with CPU2 at startup (`IPC_sync`).
 ## 4. Toolchain (pin exact versions in `toolchain.md`)
 
 - MATLAB/Simulink **R2025b** with Embedded Coder and C2000 Microcontroller Blockset
-- Code Composer Studio (CCS)
-- TI C2000 Code Generation Tools (C28x compiler, which also compiles CLA code)
-- C2000Ware (driverlib, device support, linker command files): copied into
-  `ccs/ext/c2000ware/` for Project B only. **Proposed: 5.02.00.00**, the
-  version MathWorks verifies for the R2025b blockset, so both projects use the
-  same version. Not yet confirmed; nothing is copied before confirmation.
-- C28x compiler 22.6.0.LTS and CCS 20.0.1, both verified for R2025b
+- **Code Composer Studio 20.0.1** only (Theia-based CCS 20). Older CCS
+  versions (Eclipse-based v12 and earlier) are not supported. Projects,
+  `.projectspec` files and build scripts target CCS 20.
+- **TI C28x compiler 22.6.0.LTS** (also compiles CLA code)
+- **C2000Ware 5.02.00.00** (driverlib, device support, linker command files),
+  copied into `ccs/ext/c2000ware/` for Project B only. Project A uses the same
+  version from the blockset installation.
+- These are the versions MathWorks verifies for the R2025b C2000 blockset, so
+  both projects build with identical TI tools.
 - Licensed CANopen stack (later), version to be recorded when it arrives
 - Hardware: LAUNCHXL-F28379D or the custom power stage board
 
@@ -299,7 +301,8 @@ Each phase ends with one PR. Each phase must keep both projects buildable.
   and fail if `git diff` is non-empty.
 - **Model reference equality**: the control code that Project A generates
   matches `control/generated/`.
-- **CCS headless build** of `cpu1` and `cpu2` (`eclipsec -noSplash -application com.ccstudio.apps.projectBuild ...`)
+- **CCS headless build** of `cpu1` and `cpu2` with the CCS 20 command line
+  (`ccs-server-cli -noSplash -workspace <ws> -application com.ti.ccs.apps.buildProject -ccs.projects <name>`)
   with warnings treated as errors for handwritten code.
 - **Host unit tests** for `ccs/common/` (IPC protocol, utilities).
 - **Back-to-back**: recorded input vectors run through the model (MIL), the
@@ -317,14 +320,13 @@ Decided (2026-10-22):
 - Project A uses model reference for the control models.
 - C2000Ware is copied into the repo, for handwritten code only.
 - Communication runs on CPU2: SCI now, licensed CANopen stack later.
-- MATLAB R2025b Update 5 (see `toolchain.md`).
+- MATLAB R2025b Update 5, CCS 20.0.1, C28x compiler 22.6.0.LTS, C2000Ware
+  5.02.00.00 for both projects (see `toolchain.md`).
 
 Open:
 
-1. C2000Ware 5.02.00.00 / C28x compiler 22.6.0.LTS / CCS 20.0.1: proposed, awaiting confirmation
-   (see `toolchain.md`).
-2. Simulink models: to be supplied, then Phase 1 starts.
-3. CANopen stack: vendor, license terms (may it be committed?), C2000 port.
+1. Simulink models: to be supplied, then Phase 1 starts.
+2. CANopen stack: vendor, license terms (may it be committed?), C2000 port.
 
 ---
 

@@ -29,12 +29,11 @@ MathWorks verifies these versions for the C2000 Microcontroller Blockset R2025b
 
 | Tool | Version | Used by |
 |---|---|---|
-| Code Composer Studio | 20.0.1 (blockset supports CCSv3 to CCSv20) | Project A and B |
+| Code Composer Studio | 20.0.1 (CCS 20 only; older CCS versions are not supported) | Project A and B |
 | C2000Ware | 5.02.00.00 | Project A (blockset install), Project B (copy in `ccs/ext/c2000ware/`) |
 | TI C28x Code Generation Tools | 22.6.0.LTS | Project A and B |
 
-Status: **proposed, awaiting confirmation.** Nothing from C2000Ware has been
-copied yet.
+Status: **confirmed** (2026-10-22).
 
 Reason: if both projects use the same C2000Ware and compiler, any difference in
 the back-to-back comparison (Phase 8) comes from the workflow, not from the
