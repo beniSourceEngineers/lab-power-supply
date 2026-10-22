@@ -64,12 +64,17 @@ lab-power-supply/
 │   │   ├── ipc/               ← C++ IPC abstraction (§6)
 │   │   ├── shared_types/      ← message structs exchanged between cores
 │   │   └── util/
-│   ├── cpu1/                  ← CCS project for CPU1 (+ CLA1)
+│   ├── cpu1/                  ← CCS project for CPU1: control, power stage
 │   │   ├── src/               ← main, ISRs, HAL, application, control wrappers
-│   │   ├── cla/               ← CLA tasks (C only, see §5)
+│   │   ├── cla/               ← later: CLA tasks (C only, see §5)
 │   │   └── cmd/               ← linker command files
-│   ├── cpu2/                  ← CCS project for CPU2 (+ CLA2)
-│   └── ext/                   ← C2000Ware driverlib (submodule or pinned copy)
+│   ├── cpu2/                  ← CCS project for CPU2: communication
+│   │   ├── src/               ← main, comm layer (SCI now, CANopen later)
+│   │   ├── third_party/       ← licensed CANopen stack (see §3.5)
+│   │   └── cmd/
+│   └── ext/
+│       └── c2000ware/         ← pinned copy of C2000Ware (driverlib, device
+│                                support, linker files) for handwritten code only
 │
 ├── test/
 │   ├── host/                  ← host unit tests (IPC, glue logic) on PC
@@ -92,8 +97,8 @@ Control lives only in `control/models/`, and its code only in
 - Inputs and outputs are **bus objects** defined in the data dictionary, e.g.
   `CurrentLoopIn` (measured values, setpoints, limits, enable) and
   `CurrentLoopOut` (duty cycle, saturation flags).
-- Units and scaling are fixed at the interface (physical units in `single`, or
-  documented fixed-point types).
+- All control is **floating point**: physical units as `single` (FPU32). No
+  fixed point and no `double`.
 - Each model has an explicit sample time and one entry point (`step`) plus
   `initialize`. Multi-rate models are avoided unless needed.
 
@@ -106,11 +111,10 @@ Control lives only in `control/models/`, and its code only in
 - `control/scripts/generate_control.m` runs a standalone ERT build per control
   model and copies the code to `control/generated/<Model>/`.
 - **Project B (CCS)** compiles `control/generated/` directly.
-- **Project A (Simulink full)** uses the same models through Model reference
-  blocks. Because both builds use the same configuration set, the generated
-  model-reference code must match `control/generated/`. CI checks this (§8).
-  - Alternative, if model-reference code ever differs: Project A includes
-    `control/generated/` as custom code. Decide this in Phase 2.
+- **Project A (Simulink full)** uses the same models through **Model
+  reference blocks** (decided). Because both builds use the same configuration
+  set, the generated model-reference code must match `control/generated/`.
+  CI checks this (§8).
 - Code interface: prefer **reusable (multi-instance) code** with the model data
   passed as an argument, so a C++ wrapper class can own each instance. Function
   prototypes are fixed with *Configure C Step Function Interface*, e.g.
@@ -124,21 +128,46 @@ Control lives only in `control/models/`, and its code only in
   classes (`ctrl::CurrentLoop`, …) that map HAL data to model buses.
 - HAL classes wrap driverlib (ADC, ePWM, CMPSS, GPIO, SCI/CAN, CPU timers),
   with no business logic.
+- C2000Ware is **copied** into `ccs/ext/c2000ware/` and used **only by the
+  handwritten code** (Project B). Project A uses the C2000Ware that the
+  MathWorks C2000 Microcontroller Blockset installs and expects; do not point
+  the blockset at the copy in this repo. Copy only what is needed (F2837xD
+  driverlib, device headers/support, linker command files), and keep the
+  license files.
 - The application layer covers the state machine (Off / Soft-start / CV / CC /
   Fault), protection, setpoint handling, communication and HMI.
 
-### 3.4 Core and CLA allocation (proposal, confirm with the existing model)
+### 3.4 Core and CLA allocation (decided)
 
 | Unit | Responsibilities |
 |---|---|
-| CPU1 | System init, peripheral ownership hand-over to CPU2, ADC/ePWM HAL, fast ISR, protection/trip, state machine |
-| CLA1 | Fast inner loop (e.g. current loop), triggered by ADC end of conversion |
-| CPU2 | Slower outer loops/supervision, communication (SCI/CAN/USB), HMI, logging |
-| CLA2 | Spare, or filtering/measurement post-processing |
+| CPU1 | System init, boot of CPU2, peripheral ownership hand-over, ADC/ePWM/CMPSS HAL, **all control loops**, protection/trip, state machine |
+| CLA1 | **Not used for now.** Later step: move selected loops here (§7, Phase 10) |
+| CPU2 | **Communication**: SCI now, licensed CANopen stack later; command parsing, setpoints/limits to CPU1 via IPC, measurements/status from CPU1 |
+| CLA2 | Not used |
+
+Keep the control wrappers on CPU1 free of assumptions about the executing
+unit (inputs/outputs only through the bus structs), so a later move to CLA1 does
+not change the interface.
 
 CPU1 must boot CPU2, assign GSx RAM and peripheral ownership (`MemCfg`,
-`SysCtl_selectCPUForPeripheral`) and synchronise with CPU2 at startup
-(`IPC_sync`).
+`SysCtl_selectCPUForPeripheral`, e.g. the SCI and later CAN module to CPU2) and
+synchronise with CPU2 at startup (`IPC_sync`).
+
+### 3.5 Communication on CPU2
+
+- **Now:** SCI (UART) with a simple framed protocol (e.g. SLIP/COBS + CRC16):
+  set voltage/current/limits, output on/off, read measurements and status.
+- **Later:** a licensed third-party **CANopen** stack. To prepare:
+  - The application talks to an abstract `comm::` interface (object
+    dictionary-like parameter access: read/write by index), not to SCI
+    directly. SCI and CANopen become two implementations of it.
+  - The stack goes into `ccs/cpu2/third_party/canopen/`. Check the license
+    before committing it. If it may not be in this repo, reference it via an
+    install-path variable and keep only the porting layer (driver/timer glue)
+    here.
+  - The stack will most likely be C. Integrate it via `extern "C"` and check
+    its C2000 port (16-bit `char`, CAN driver on driverlib).
 
 ---
 
@@ -147,7 +176,12 @@ CPU1 must boot CPU2, assign GSx RAM and peripheral ownership (`MemCfg`,
 - MATLAB/Simulink with Embedded Coder, C2000 Microcontroller Blockset, Fixed-Point Designer (if used)
 - Code Composer Studio (CCS)
 - TI C2000 Code Generation Tools (C28x compiler, which also compiles CLA code)
-- C2000Ware (driverlib, device support, linker command files)
+- C2000Ware (driverlib, device support, linker command files): copied into
+  `ccs/ext/c2000ware/` for Project B only. **Proposed: 26.02.00.00 LTS**, not
+  yet confirmed; nothing is copied before confirmation.
+- C28x compiler version to match C2000Ware (TI states 25.11.1.LTS for
+  C2000Ware 26.02, to be verified)
+- Licensed CANopen stack (later), version to be recorded when it arrives
 - Hardware: LAUNCHXL-F28379D or the custom power stage board
 
 Every release of either project must state which versions built it.
@@ -177,7 +211,7 @@ Every release of either project must state which versions built it.
 - Naming: namespaces `hal::`, `ipc::`, `ctrl::`, `app::`. Files are
   `snake_case.hpp/.cpp`, and types are `PascalCase`.
 
-### CLA
+### CLA (later step, not used now)
 
 - The CLA compiler supports **C only**, so no C++ is allowed in `cla/`.
 - CLA restrictions: no recursion, no function pointers, limited integer
@@ -247,13 +281,15 @@ Each phase ends with one PR. Each phase must keep both projects buildable.
 | 0 | **Repo setup** | Layout, `toolchain.md`, `.gitignore` (slprj, codegen, CCS Debug/Release), this file |
 | 1 | **Baseline import** | Existing fully generated model in `simulink_full/`, builds and runs on target; reference measurements recorded (step response, ISR timing, CPU load) |
 | 2 | **Partition the model** | Control algorithms extracted to `control/models/` with bus interfaces and data dictionary; `simulink_full/` references them; behaviour equal to Phase 1 (SIL/PIL back-to-back + target measurement) |
-| 3 | **Shared code generation** | `generate_control.m` gives deterministic code in `control/generated/`; interface (prototypes, memory sections, CLA compatibility) defined; decide model reference vs. custom code for Project A |
+| 3 | **Shared code generation** | `generate_control.m` gives deterministic code in `control/generated/`; interface (prototypes, memory sections) defined; Project A model-reference code equals `control/generated/` |
 | 4 | **CCS skeleton** | `ccs/cpu1`, `ccs/cpu2` projects in C++03 with driverlib, linker files, boot of CPU2, blinky + timer ISR on both cores |
 | 5 | **IPC library** | `ipc::Mailbox`, `Queue`, `CommandLink`, `syncCores`; host unit tests; target test with both cores exchanging data |
 | 6 | **HAL + glue logic** | ADC/ePWM/CMPSS/trip-zone HAL, state machine, protection; open loop on hardware |
 | 7 | **Integrate control** | Generated control called from ISR/CLA through C++ wrappers; closed loop on hardware |
 | 8 | **Verification** | Back-to-back comparison Project A and Project B (same inputs give the same outputs); timing/CPU load compared with Phase 1 |
 | 9 | **Documentation** | Migration guide in `docs/`: steps, pitfalls, comparison of the workflows |
+| 10 | **CLA (later)** | Selected control loops moved to CLA1 in both projects; CLA-compatible code generation; back-to-back again |
+| 11 | **CANopen (later)** | Licensed CANopen stack on CPU2 behind the `comm::` interface; SCI stays as service/debug interface |
 
 ---
 
@@ -262,7 +298,7 @@ Each phase ends with one PR. Each phase must keep both projects buildable.
 - **Generated code check**: regenerate `control/generated/` in MATLAB batch mode
   and fail if `git diff` is non-empty.
 - **Model reference equality**: the control code that Project A generates
-  matches `control/generated/` (if model reference is chosen in Phase 3).
+  matches `control/generated/`.
 - **CCS headless build** of `cpu1` and `cpu2` (`eclipsec -noSplash -application com.ccstudio.apps.projectBuild ...`)
   with warnings treated as errors for handwritten code.
 - **Host unit tests** for `ccs/common/` (IPC protocol, utilities).
@@ -272,16 +308,23 @@ Each phase ends with one PR. Each phase must keep both projects buildable.
 
 ---
 
-## 9. Open questions
+## 9. Decisions and open questions
 
-1. Which loops run on which core/CLA in the existing model? (Confirms §3.4.)
-2. Is the control logic floating point (`single`) or fixed point?
-3. Does any control model run on the CLA today? If yes, which CLA code-generation
-   settings does it use?
-4. Should Project A use model reference or include `control/generated/` as
-   custom code? (Decide in Phase 3.)
-5. Is C2000Ware vendored, a git submodule, or an install-path variable?
-6. Which communication interfaces does CPU2 use (SCI, CAN, USB, SPI)?
+Decided (2026-10-22):
+
+- All control loops run on CPU1. Floating point (`single`).
+- No CLA for now; CLA comes in a later step (Phase 10).
+- Project A uses model reference for the control models.
+- C2000Ware is copied into the repo, for handwritten code only.
+- Communication runs on CPU2: SCI now, licensed CANopen stack later.
+
+Open:
+
+1. C2000Ware version: 26.02.00.00 LTS proposed, awaiting confirmation.
+2. MATLAB release and C2000 blockset version used for the existing model.
+   This fixes which C2000Ware and compiler Project A uses.
+3. Simulink models: to be supplied, then Phase 1 starts.
+4. CANopen stack: vendor, license terms (may it be committed?), C2000 port.
 
 ---
 
