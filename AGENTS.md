@@ -59,6 +59,12 @@ lab-power-supply/
 │   ├── LabPsu_CPU2.slx          control/models/* via Model blocks
 │   └── scripts/
 │
+├── simulation/                ← system simulation (MIL), not for code generation
+│   ├── LabPsu_System.slx      ← control models (Model reference) + plant
+│   ├── plant/                 ← power stage, output filter, load (Simscape)
+│   ├── interface/             ← ADC/PWM/IPC effects between control and plant
+│   └── tests/                 ← Simulink Test harnesses and test vectors
+│
 ├── ccs/                       ← PROJECT B: Code Composer Studio, C++03
 │   ├── common/                ← code shared by both cores
 │   │   ├── ipc/               ← C++ IPC abstraction (§6)
@@ -173,6 +179,30 @@ synchronise with CPU2 at startup (`IPC_sync`).
     here.
   - The stack will most likely be C. Integrate it via `extern "C"` and check
     its C2000 port (16-bit `char`, CAN driver on driverlib).
+
+### 3.6 System simulation
+
+A Simulink system model connects **all control models with plant models**
+for model-in-the-loop (MIL) simulation of the whole power supply.
+
+- `simulation/LabPsu_System.slx` references the control models in
+  `control/models/` via **Model reference**, the same way Project A does.
+  Simulation, Project A and Project B therefore all use the same control.
+- Plant models (power stage, output filter, load, measurement circuits) live
+  in `simulation/plant/` and use Simscape / Simscape Electrical. They never go
+  into `control/`, so code generation never depends on Simscape.
+- The effects of the hardware sit between the control and the plant, in
+  `simulation/interface/`, not in the control models: ADC sampling and
+  quantisation, PWM update delay, and the delay of setpoints from CPU2 to
+  CPU1 over IPC.
+- Simulink Test harnesses in `simulation/tests/` define the scenarios (start-up,
+  load steps, CV/CC transitions, short circuit, ...). The recorded inputs and
+  outputs are the reference vectors for the back-to-back comparison (§8).
+- **Gap:** the state machine and protection are Simulink in Project A but
+  handwritten C++ in Project B. A system simulation with only control + plant
+  does not cover them. Decide in Phase 2 whether supervisory decisions also
+  become a control model (then they are simulated and shared) or stay in the
+  glue logic (then they are tested with unit/integration tests only).
 
 ---
 
@@ -381,6 +411,7 @@ Each phase ends with one PR. Each phase must keep both projects buildable.
 | 0 | **Repo setup** | Layout, `toolchain.md`, `.gitignore` (slprj, codegen, CCS Debug/Release), this file |
 | 1 | **Baseline import** | Existing fully generated model in `simulink_full/`, builds and runs on target; reference measurements recorded (step response, ISR timing, CPU load) |
 | 2 | **Partition the model** | Control algorithms extracted to `control/models/` with bus interfaces and data dictionary; `simulink_full/` references them; behaviour equal to Phase 1 (SIL/PIL back-to-back + target measurement) |
+| 2a | **System simulation** | `simulation/LabPsu_System.slx` with all control models + plant models; Simulink Test scenarios; reference vectors recorded |
 | 3 | **Shared code generation** | `generate_control.m` gives deterministic code in `control/generated/`; interface (prototypes, memory sections) defined; Project A model-reference code equals `control/generated/` |
 | 4 | **CCS skeleton** | `ccs/cpu1`, `ccs/cpu2` projects in C++03 with driverlib, linker files, boot of CPU2, blinky + timer ISR on both cores |
 | 5 | **IPC library** | IPC interfaces + `ipc::Mailbox`, `Queue`, `CommandLink`, `syncCores`; mocks; host unit tests; target test with both cores exchanging data |
@@ -405,9 +436,9 @@ Each phase ends with one PR. Each phase must keep both projects buildable.
 - **Host unit and integration tests** (`test/unit/`, `test/integration/`) with
   GoogleTest/GoogleMock, plus a host build of the production code with
   `-std=c++03 -pedantic`.
-- **Back-to-back**: recorded input vectors run through the model (MIL), the
-  generated code (SIL) and the target (PIL/HIL), and the outputs are compared
-  within a tolerance.
+- **Back-to-back**: input vectors recorded in the system simulation
+  (`simulation/tests/`, MIL) run through the generated code (SIL) and the
+  target (PIL/HIL), and the outputs are compared within a tolerance.
 
 ---
 
@@ -427,6 +458,9 @@ Open:
 
 1. Simulink models: to be supplied, then Phase 1 starts.
 2. CANopen stack: vendor, license terms (may it be committed?), C2000 port.
+3. State machine / protection: part of a control model (simulated, shared) or
+   glue logic only (§3.6)? Decide in Phase 2.
+4. Plant models: existing ones to be supplied, or built in Phase 2a?
 
 ---
 
