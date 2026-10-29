@@ -3,9 +3,9 @@
  *
  * Code generated for Simulink model 'Current_Control'.
  *
- * Model version                  : 1.13
+ * Model version                  : 1.14
  * Simulink Coder version         : 25.2 (R2025b) 28-Jul-2025
- * C/C++ source code generated on : Wed Oct 28 09:38:23 2026
+ * C/C++ source code generated on : Thu Oct 29 21:47:12 2026
  *
  * Target selection: ert.tlc
  * Embedded hardware selection: Texas Instruments->C2000
@@ -147,7 +147,7 @@ void Current_Control_step(RT_MODEL_Current_Control_T *const Current_Control_M,
    *  DiscreteIntegrator: '<S42>/Integrator'
    *  Gain: '<S47>/Proportional Gain'
    */
-  rtb_UkYk1 = 0.01F * rtb_lo + Current_Control_DW->Integrator_DSTATE;
+  rtb_UkYk1 = 0.001F * rtb_lo + Current_Control_DW->Integrator_DSTATE;
 
   /* Switch: '<S50>/Switch2' incorporates:
    *  Constant: '<Root>/Constant2'
@@ -207,7 +207,7 @@ void Current_Control_step(RT_MODEL_Current_Control_T *const Current_Control_M,
   rtb_UkYk1 -= rtb_IC1;
 
   /* Gain: '<S39>/Integral Gain' */
-  rtb_lo *= 0.5F;
+  rtb_lo *= 10.0F;
 
   /* Update for DiscreteIntegrator: '<S42>/Integrator' incorporates:
    *  Constant: '<Root>/Constant1'

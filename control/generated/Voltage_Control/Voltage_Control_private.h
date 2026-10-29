@@ -3,9 +3,9 @@
  *
  * Code generated for Simulink model 'Voltage_Control'.
  *
- * Model version                  : 1.6
+ * Model version                  : 1.7
  * Simulink Coder version         : 25.2 (R2025b) 28-Jul-2025
- * C/C++ source code generated on : Wed Oct 28 09:38:54 2026
+ * C/C++ source code generated on : Thu Oct 29 21:47:30 2026
  *
  * Target selection: ert.tlc
  * Embedded hardware selection: Texas Instruments->C2000

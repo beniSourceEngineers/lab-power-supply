@@ -3,9 +3,9 @@
  *
  * Code generated for Simulink model 'Voltage_Control'.
  *
- * Model version                  : 1.6
+ * Model version                  : 1.7
  * Simulink Coder version         : 25.2 (R2025b) 28-Jul-2025
- * C/C++ source code generated on : Wed Oct 28 09:38:54 2026
+ * C/C++ source code generated on : Thu Oct 29 21:47:30 2026
  *
  * Target selection: ert.tlc
  * Embedded hardware selection: Texas Instruments->C2000
@@ -217,9 +217,6 @@ void Voltage_Control_step(RT_MODEL_Voltage_Control_T *const Voltage_Control_M,
    *  Switch: '<S35>/Switch'
    */
   rtb_UkYk1 -= rtb_IC1;
-
-  /* Gain: '<S40>/Integral Gain' */
-  rtb_lo *= 0.5F;
 
   /* Update for DiscreteIntegrator: '<S43>/Integrator' incorporates:
    *  Constant: '<Root>/Constant1'
