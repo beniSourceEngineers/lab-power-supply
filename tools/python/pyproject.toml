@@ -1,0 +1,26 @@
+[project]
+name = "labpsu-sci"
+version = "0.1.0"
+description = "PC tool for the LabPSU CPU2 SCI protocol (doc/sci_protocol.md)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "dearpygui>=2.0",
+    "pyserial>=3.5",
+]
+
+[project.scripts]
+labpsu-sci = "labpsu_sci.gui:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/labpsu_sci"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
