@@ -240,11 +240,13 @@ Project B explores two variants and compares them:
 - **Code Composer Studio 20.0.1** only (Theia-based CCS 20). Older CCS
   versions (Eclipse-based v12 and earlier) are not supported. Projects,
   `.projectspec` files and build scripts target CCS 20.
-- **TI C28x compiler 22.6.0.LTS** (also compiles CLA code)
+- **TI C28x compiler 22.6.1.LTS** (also compiles CLA code; the version
+  CCS 20.0.1 installs)
 - **C2000Ware 5.02.00.00** (driverlib, device support, linker command files),
   copied into `ccs/ext/c2000ware/` for Project B only. Project A uses the same
   version from the blockset installation.
-- These are the versions MathWorks verifies for the R2025b C2000 blockset, so
+- These are the versions MathWorks verifies for the R2025b C2000 blockset
+  (MathWorks lists compiler 22.6.0.LTS; 22.6.1.LTS is its patch release), so
   both projects build with identical TI tools.
 - Licensed CANopen stack (later), version to be recorded when it arrives
 - Hardware: LAUNCHXL-F28379D or the custom power stage board
@@ -483,7 +485,7 @@ Decided (2026-10-22):
 - Protection logic is part of the control models (~10 kHz).
 - State machine in Stateflow; Project B explores generated Stateflow (B1) and
   a handwritten C++03 FSM (B2).
-- MATLAB R2025b Update 5, CCS 20.0.1, C28x compiler 22.6.0.LTS, C2000Ware
+- MATLAB R2025b Update 5, CCS 20.0.1, C28x compiler 22.6.1.LTS, C2000Ware
   5.02.00.00 for both projects (see `toolchain.md`).
 
 Open:
