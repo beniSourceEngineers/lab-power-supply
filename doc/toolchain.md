@@ -101,6 +101,22 @@ Notes:
   (`ccs/utils/sysconfig_1.22.0`).
 - Call the headless CLI `ccs/eclipse/ccs-server-cli.sh` from its own directory.
   Started from another working directory, it fails with `node: not found`.
+- On Ubuntu 24.04 and later, CCS (`ccs/theia/ccstudio`, an Electron app) crashes
+  at start with *"The SUID sandbox helper binary was found, but is not
+  configured correctly"*. AppArmor blocks unprivileged user namespaces
+  (`kernel.apparmor_restrict_unprivileged_userns = 1`), which the Chromium
+  sandbox needs. Start CCS with `--no-sandbox`, and add the flag to the menu
+  entry in `~/.local/share/applications/CCS 20.0.1.desktop` (absolute path;
+  `.desktop` files do not expand `~` or `$HOME`):
+
+  ```
+  Exec=/home/<user>/ti/ccs2001/ccs/theia/ccstudio --no-sandbox
+  ```
+
+  This turns the Chromium sandbox off. A reinstall or update of CCS may
+  overwrite the menu entry. An alternative that keeps the sandbox is an
+  AppArmor profile that allows `userns` for `ccstudio` (as Ubuntu ships for
+  VS Code and Chrome).
 
 ## Third party
 
