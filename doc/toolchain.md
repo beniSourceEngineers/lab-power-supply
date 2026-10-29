@@ -40,6 +40,34 @@ the back-to-back comparison (Phase 8) comes from the workflow, not from the
 tools. A newer C2000Ware (latest: 26.02.00.00 LTS with compiler 25.11.1.LTS) is
 possible for Project B, but MathWorks has not verified it for R2025b.
 
+### C2000Ware installation (Linux)
+
+| | |
+|---|---|
+| Installer | `C2000Ware_5_02_00_00_setup.run` |
+| SHA-256 | `f1fcb206ce9aa653267522b489707d9a7bf86c439693f6f2fdf288ac6cb5d3aa` |
+| Install path | `~/ti/c2000/C2000Ware_5_02_00_00` |
+
+The installer is a 32-bit (i386) InstallBuilder binary. On current Linux
+distributions (e.g. Ubuntu with glibc 2.43, kernel 7.0) it fails with *"Unable
+to initialize installer"* or crashes with a segmentation fault, even with
+`libc6:i386` installed. Run it in an Ubuntu 20.04 container instead (rootless
+podman, no sudo needed):
+
+```sh
+mkdir -p ~/ti/c2000
+podman run --rm \
+  -v ~/Downloads/C2000Ware_5_02_00_00_setup.run:/inst/setup.run:ro,Z \
+  -v ~/ti/c2000:/out:Z \
+  docker.io/library/ubuntu:20.04 bash -c '
+    dpkg --add-architecture i386 && apt-get update -qq &&
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq libc6:i386 &&
+    /inst/setup.run --mode unattended --prefix /out'
+```
+
+The installer creates `C2000Ware_5_02_00_00/` below the prefix. The subset that
+Project B uses is copied into `ccs/ext/c2000ware/` (see its `README.md`).
+
 ## Third party
 
 | Component | Version | Notes |
