@@ -38,3 +38,15 @@ codegen/
 # SimBiology backup files
 *.sbproj.backup
 *.sbproj.bak
+
+# CCS build output (one folder per build configuration) and generated files
+ccs/cpu*/CPU1_*/
+ccs/cpu*/CPU2_*/
+ccs/cpu*/Debug/
+ccs/cpu*/Release/
+ccs/**/.clangd
+ccs/**/.settings/org.eclipse.core.resources.prefs
+ccs/**/.launches/
+
+# Host test build
+build/
