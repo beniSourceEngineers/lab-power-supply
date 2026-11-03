@@ -10,6 +10,8 @@ extern "C" {
 #include "app/Blinker.hpp"
 #include "hal/CpuTimer.hpp"
 #include "hal/GpioOutput.hpp"
+#include "ipc/SyncCores.hpp"
+#include "shared_types/IpcFlags.hpp"
 
 namespace {
 
@@ -54,7 +56,7 @@ int main()
 
     // CPU2 waits for this flag before it touches any peripheral that CPU1
     // hands over above.
-    IPC_sync(IPC_CPU1_L_CPU2_R, IPC_FLAG31);
+    ipc::syncCores(IPC_CPU1_L_CPU2_R, shared_types::kIpcFlagSync);
 
     Interrupt_initModule();
     Interrupt_initVectorTable();
