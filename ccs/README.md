@@ -39,7 +39,7 @@ is ignored by git.
 - **RAM** (development): build `CPU1_RAM` and `CPU2_RAM`, start a debug session
   with `cpu1/targetConfigs/TMS320F28379D.ccxml`, load `labpsu_cpu1.out` on
   CPU1 and `labpsu_cpu2.out` on CPU2, run both. CPU1 configures the GPIOs and
-  hands LED2 to CPU2; both cores meet at `IPC_sync` (flag 31).
+  hands LED2 to CPU2; both cores meet at `ipc::syncCores` (flag 31).
 - **Flash, with debugger**: `CPU1_FLASH` + `CPU2_FLASH`, load and run both
   cores as above.
 - **Flash, stand-alone**: `CPU1_FLASH_STANDALONE` + `CPU2_FLASH`. CPU1 boots CPU2
@@ -58,6 +58,22 @@ cd ~/ti/ccs2001/ccs/eclipse      # the CLI must be started from its own folder
 ./ccs-server-cli.sh -noSplash -workspace <ws> -application projectBuild \
     -ccs.projects labpsu_cpu1 -ccs.configuration CPU1_RAM
 ```
+
+## IPC
+
+`common/ipc/` holds the channels between the cores (AGENTS.md §6). To add one:
+
+1. Put the message type in `common/shared_types/`, with a
+   `STATIC_ASSERT_SIZE_WORDS` check, and allocate its flag in `IpcFlags.hpp`.
+2. Add its storage to the channel struct of that direction. There is one struct
+   per direction, shared by both cores, and each is the only object in its section
+   (`common/ipc/MsgRamSections.hpp`). A queue has storage in both structs.
+3. In each `main.cpp`, create the `ipc::Mailbox` or `ipc::Queue` on that storage.
+   Initialise that core's side before `ipc::syncCores` and use it only afterwards.
+
+The message RAM map is in `common/ipc/msgram_memory.inc` and
+`msgram_sections.inc`, which the linker command files of both cores include.
+`test/target/README.md` describes the IPC test on the LaunchPad.
 
 ## Host tests
 

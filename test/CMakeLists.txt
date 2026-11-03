@@ -5,6 +5,7 @@
 # Two parts:
 #  - labpsu_production_cxx03: production sources compiled as C++03 with
 #    -pedantic -Werror, to catch C++11 features that the C28x compiler rejects.
+#    Templates are instantiated in cxx03/, as they are only compiled when used.
 #  - labpsu_unit_tests: GoogleTest/GoogleMock unit tests (newer C++ allowed).
 cmake_minimum_required(VERSION 3.20)
 project(labpsu_host_tests CXX)
@@ -26,6 +27,9 @@ add_library(labpsu_production_cxx03 STATIC
     ${CCS_DIR}/common/app/Blinker.cpp
     ${CCS_DIR}/common/hal/CpuTimer.cpp
     ${CCS_DIR}/common/hal/GpioOutput.cpp
+    ${CCS_DIR}/common/ipc/CommandLink.cpp
+    ${CCS_DIR}/common/ipc/SyncCores.cpp
+    cxx03/IpcTemplates.cpp
 )
 target_include_directories(labpsu_production_cxx03 PUBLIC
     ${CCS_DIR}/common
@@ -36,12 +40,20 @@ target_compile_options(labpsu_production_cxx03 PRIVATE -std=c++03 -pedantic -Wal
 add_executable(labpsu_unit_tests
     fakes/FakeDriverlib.cpp
     unit/BlinkerTest.cpp
+    unit/CommandLinkTest.cpp
     unit/CpuTimerTest.cpp
     unit/GpioOutputTest.cpp
+    unit/IpcMocksTest.cpp
+    unit/MailboxStressTest.cpp
+    unit/MailboxTest.cpp
+    unit/QueueStressTest.cpp
+    unit/QueueTest.cpp
+    unit/SyncCoresTest.cpp
 )
 target_include_directories(labpsu_unit_tests PRIVATE fakes mocks)
 target_compile_features(labpsu_unit_tests PRIVATE cxx_std_17)
-target_link_libraries(labpsu_unit_tests PRIVATE labpsu_production_cxx03 GTest::gmock_main)
+find_package(Threads REQUIRED)
+target_link_libraries(labpsu_unit_tests PRIVATE labpsu_production_cxx03 GTest::gmock_main Threads::Threads)
 
 include(GoogleTest)
 gtest_discover_tests(labpsu_unit_tests)

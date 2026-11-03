@@ -10,6 +10,8 @@ extern "C" {
 #include "app/Blinker.hpp"
 #include "hal/CpuTimer.hpp"
 #include "hal/GpioOutput.hpp"
+#include "ipc/SyncCores.hpp"
+#include "shared_types/IpcFlags.hpp"
 
 namespace {
 
@@ -33,7 +35,7 @@ int main()
     Device_init();
 
     // Wait until CPU1 has configured the GPIOs and handed LED2 over.
-    IPC_sync(IPC_CPU2_L_CPU1_R, IPC_FLAG31);
+    ipc::syncCores(IPC_CPU2_L_CPU1_R, shared_types::kIpcFlagSync);
 
     Interrupt_initModule();
     Interrupt_initVectorTable();

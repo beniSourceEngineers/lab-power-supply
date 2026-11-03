@@ -49,8 +49,7 @@ PAGE 1 :
    RAMGS0          : origin = 0x00C000, length = 0x001000
    RAMGS1          : origin = 0x00D000, length = 0x001000
    RAMGS2          : origin = 0x00E000, length = 0x001000
-   CPU2TOCPU1RAM   : origin = 0x03F800, length = 0x000400
-   CPU1TOCPU2RAM   : origin = 0x03FC00, length = 0x000400
+#include "../../common/ipc/msgram_memory.inc"
 }
 
 SECTIONS
@@ -129,6 +128,8 @@ SECTIONS
       initialised at boot: each core may only write its own message RAM. */
    MSGRAM_CPU1_TO_CPU2 : > CPU1TOCPU2RAM, PAGE = 1, type = NOINIT
    MSGRAM_CPU2_TO_CPU1 : > CPU2TOCPU1RAM, PAGE = 1, type = NOINIT
+
+#include "../../common/ipc/msgram_sections.inc"
 
    /* The following section definitions are required when using the IPC API Drivers */
     GROUP : > CPU2TOCPU1RAM, PAGE = 1

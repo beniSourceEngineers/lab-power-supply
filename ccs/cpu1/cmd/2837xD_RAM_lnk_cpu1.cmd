@@ -66,8 +66,7 @@ PAGE 1 :
 //   RAMGS15_RSVD : origin = 0x01BFF8, length = 0x000008    /* Reserve and do not use for code as per the errata advisory "Memory: Prefetching Beyond Valid Memory" */
                                                             /* Only on F28379D, F28377D, F28375D devices. Remove line on other devices. */
 
-   CPU2TOCPU1RAM   : origin = 0x03F800, length = 0x000400
-   CPU1TOCPU2RAM   : origin = 0x03FC00, length = 0x000400
+#include "../../common/ipc/msgram_memory.inc"
 
    CANA_MSG_RAM     : origin = 0x049000, length = 0x000800
    CANB_MSG_RAM     : origin = 0x04B000, length = 0x000800
@@ -115,6 +114,8 @@ SECTIONS
       initialised at boot: each core may only write its own message RAM. */
    MSGRAM_CPU1_TO_CPU2 : > CPU1TOCPU2RAM, PAGE = 1, type = NOINIT
    MSGRAM_CPU2_TO_CPU1 : > CPU2TOCPU1RAM, PAGE = 1, type = NOINIT
+
+#include "../../common/ipc/msgram_sections.inc"
 
    /* The following section definitions are required when using the IPC API Drivers */
     GROUP : > CPU1TOCPU2RAM, PAGE = 1

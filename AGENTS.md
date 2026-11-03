@@ -378,57 +378,65 @@ F28379D IPC resources are 32 IPC flags per direction (with interrupts on
 flags 0–3), the message RAMs `CPU1TOCPU2MSGRAM`/`CPU2TOCPU1MSGRAM`
 (write-only for the sender), and GSx RAM with configurable owner.
 
-Planned design (`ccs/common/ipc/`):
+Design (`ccs/common/ipc/`):
 
 ```cpp
 namespace ipc {
 
-// IMailboxWriter.hpp / IMailboxReader.hpp: what application code depends on.
-template <typename T>
-class IMailboxWriter {
-public:
-    virtual void post(const T& msg) = 0;   // copy + seq++ + set flag
-protected:
-    ~IMailboxWriter() {}
-};
+// What application code depends on. Mocks: test/mocks/Mock<Name>.hpp
+template <typename T> class IMailboxWriter;  // post(msg): copy, seq++, set flag
+template <typename T> class IMailboxReader;  // tryRead(out), hasNew()
+template <typename T> class IQueue;          // push(element), pop(out)
+class ICommandLink;                          // send(), isBusy(), response(), poll(handler)
+class ICommandHandler;                       // onCommand(): called by poll()
 
-template <typename T>
-class IMailboxReader {
-public:
-    virtual bool tryRead(T& out) = 0;      // consistent copy if new
-    virtual bool hasNew() const = 0;
-protected:
-    ~IMailboxReader() {}
-};
-
-// Mailbox.hpp: fixed-size typed channel in a message RAM section, one writer /
-// one reader. Consistency through a sequence counter (seqlock) or double buffer.
-// Mocks: test/mocks/MockMailboxWriter.hpp, MockMailboxReader.hpp
+// Latest-value channel, one writer / one reader, consistent through a sequence
+// counter (seqlock). The storage is a POD in the writer's message RAM.
 template <typename T, uint16_t Flag>
-class Mailbox : public IMailboxWriter<T>, public IMailboxReader<T> { /* ... */ };
+class Mailbox : public IMailboxWriter<T>, public IMailboxReader<T> {
+public:
+    Mailbox(MailboxStorage<T>& storage, IPC_Type_t link);
+    /* ... */
+};
 
-// Queue of fixed-size elements (ring buffer) for events/commands.
+// FIFO, single producer / single consumer, Size is a power of two. Each side
+// can only write its own message RAM, so the storage is in two parts: head and
+// slots at the producer, tail at the consumer.
 template <typename T, uint16_t Size, uint16_t Flag>
-class Queue { /* push / pop, single producer / single consumer */ };
+class Queue : public IQueue<T> {
+public:
+    Queue(QueueProducerStorage<T, Size>& producer, QueueConsumerStorage& consumer, IPC_Type_t link);
+    /* ... */
+};
 
-// Command with acknowledge, built on driverlib IPC_sendCommand/IPC_waitForAck.
-class CommandLink { /* send(cmd, addr, data), poll()/ISR dispatch */ };
+// Command with acknowledge, on driverlib IPC_sendCommand/IPC_readCommand. One
+// command per direction can be in flight.
+class CommandLink : public ICommandLink { /* ... */ };
 
-void syncCores(uint16_t flag);        // boot-time handshake (IPC_sync)
+void syncCores(IPC_Type_t link, uint16_t flag);   // boot-time handshake (IPC_sync)
 
 } // namespace ipc
 ```
 
 - Message types live in `ccs/common/shared_types/`. Both cores include the same
   header so the layout is identical, and every type has a
-  `STATIC_ASSERT(sizeof(T) == N)` check.
-- Section names and addresses are defined once, and both linker command files
-  use them.
-- The IPC classes are reached through interfaces (`IMailboxWriter<T>`,
-  `IMailboxReader<T>`, `IQueue<T>`, `ICommandLink`), so application code can be
-  tested with mocks. Unit tests for the protocols
-  (seqlock, ring buffer) run on the host in `test/unit/`, with the register
-  access replaced.
+  `STATIC_ASSERT_SIZE_WORDS(T, N)` check, which holds on the C28x and the host.
+- Section names and addresses are defined once: `ipc/msgram_memory.inc` and
+  `ipc/msgram_sections.inc` are included by the linker command files of both
+  cores, and `ipc/MsgRamSections.hpp` has the matching names for the code. The
+  start of each message RAM stays reserved for driverlib's `ipc.c`, which has its
+  buffers in the `MSGRAM_CPU*_TO_CPU*` sections.
+- Each direction has one POD struct holding all its channel storage, and it is
+  the only object in its section, so both cores see it at the same address. The
+  sections are NOINIT: a core must not write the other core's message RAM at boot.
+- Message RAM keeps its contents over a reset. Each core initialises its side of
+  every channel before `syncCores`, and uses the channels only afterwards.
+- Flags are allocated in `shared_types/IpcFlags.hpp`. The CPU2 boot ROM commands
+  use flags 0 and 31 during boot, so channels do not use them. A flag only wakes
+  the receiver; whether there is new data is decided by the protocol.
+- The IPC classes are reached through the interfaces above, so application code
+  can be tested with mocks. Unit tests for the protocols (seqlock, ring buffer)
+  run on the host in `test/unit/`, against a fake of the driverlib IPC functions.
 
 ---
 
