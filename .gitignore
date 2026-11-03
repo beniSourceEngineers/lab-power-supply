@@ -47,6 +47,10 @@ ccs/cpu*/Release/
 ccs/**/.clangd
 ccs/**/.settings/org.eclipse.core.resources.prefs
 ccs/**/.launches/
+test/target/*/CPU*_RAM/
+test/target/**/.clangd
+test/target/**/.settings/org.eclipse.core.resources.prefs
+test/target/**/.launches/
 
 # Host test build
 build/
