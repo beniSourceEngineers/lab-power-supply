@@ -29,26 +29,43 @@ add_library(labpsu_production_cxx03 STATIC
     ${CCS_DIR}/common/hal/GpioOutput.cpp
     ${CCS_DIR}/common/ipc/CommandLink.cpp
     ${CCS_DIR}/common/ipc/SyncCores.cpp
+    ${CCS_DIR}/cpu1/src/app/OpenLoopTask.cpp
+    ${CCS_DIR}/cpu1/src/hal/Adc.cpp
+    ${CCS_DIR}/cpu1/src/hal/AdcInput.cpp
+    ${CCS_DIR}/cpu1/src/hal/Cmpss.cpp
+    ${CCS_DIR}/cpu1/src/hal/EpwmTimeBase.cpp
+    ${CCS_DIR}/cpu1/src/hal/PowerStagePwm.cpp
+    ${CCS_DIR}/cpu1/src/hal/TripZone.cpp
     cxx03/IpcTemplates.cpp
 )
 target_include_directories(labpsu_production_cxx03 PUBLIC
     ${CCS_DIR}/common
+    ${CCS_DIR}/cpu1/src
     ${CMAKE_CURRENT_SOURCE_DIR}/fakes/driverlib
 )
 target_compile_options(labpsu_production_cxx03 PRIVATE -std=c++03 -pedantic -Wall -Wextra -Werror)
 
 add_executable(labpsu_unit_tests
     fakes/FakeDriverlib.cpp
+    unit/AdcInputTest.cpp
+    unit/AdcTest.cpp
+    unit/AppMocksTest.cpp
     unit/BlinkerTest.cpp
+    unit/CmpssTest.cpp
     unit/CommandLinkTest.cpp
     unit/CpuTimerTest.cpp
+    unit/EpwmTimeBaseTest.cpp
     unit/GpioOutputTest.cpp
     unit/IpcMocksTest.cpp
+    unit/LinearScalingTest.cpp
     unit/MailboxStressTest.cpp
     unit/MailboxTest.cpp
+    unit/OpenLoopTaskTest.cpp
+    unit/PowerStagePwmTest.cpp
     unit/QueueStressTest.cpp
     unit/QueueTest.cpp
     unit/SyncCoresTest.cpp
+    unit/TripZoneTest.cpp
 )
 target_include_directories(labpsu_unit_tests PRIVATE fakes mocks)
 target_compile_features(labpsu_unit_tests PRIVATE cxx_std_17)
