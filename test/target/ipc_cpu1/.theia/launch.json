@@ -1,0 +1,26 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "IPC test RAM (CPU1 + CPU2)",
+            "type": "ccs-debug",
+            "request": "launch",
+            "targetConfig": "${workspaceFolder}/../ipc_cpu1/targetConfigs/TMS320F28379D.ccxml",
+            "connections": [
+                {
+                    "name": "Texas Instruments XDS100v2 USB Debug Probe_0",
+                    "cores": [
+                        {
+                            "name": "C28xx_CPU1",
+                            "program": "${workspaceFolder}/../ipc_cpu1/CPU1_RAM/labpsu_ipc_test_cpu1.out"
+                        },
+                        {
+                            "name": "C28xx_CPU2",
+                            "program": "${workspaceFolder}/../ipc_cpu2/CPU2_RAM/labpsu_ipc_test_cpu2.out"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
