@@ -1,0 +1,68 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "LaunchPad RAM (CPU1 + CPU2)",
+            "type": "ccs-debug",
+            "request": "launch",
+            "targetConfig": "${workspaceFolder}/cpu1/targetConfigs/TMS320F28379D.ccxml",
+            "connections": [
+                {
+                    "name": "Texas Instruments XDS100v2 USB Debug Probe_0",
+                    "cores": [
+                        {
+                            "name": "C28xx_CPU1",
+                            "program": "${workspaceFolder}/cpu1/CPU1_RAM/labpsu_cpu1.out"
+                        },
+                        {
+                            "name": "C28xx_CPU2",
+                            "program": "${workspaceFolder}/cpu2/CPU2_RAM/labpsu_cpu2.out"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "LaunchPad FLASH (CPU1 + CPU2)",
+            "type": "ccs-debug",
+            "request": "launch",
+            "targetConfig": "${workspaceFolder}/cpu1/targetConfigs/TMS320F28379D.ccxml",
+            "connections": [
+                {
+                    "name": "Texas Instruments XDS100v2 USB Debug Probe_0",
+                    "cores": [
+                        {
+                            "name": "C28xx_CPU1",
+                            "program": "${workspaceFolder}/cpu1/CPU1_FLASH/labpsu_cpu1.out"
+                        },
+                        {
+                            "name": "C28xx_CPU2",
+                            "program": "${workspaceFolder}/cpu2/CPU2_FLASH/labpsu_cpu2.out"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "LaunchPad FLASH stand-alone (CPU1 + CPU2)",
+            "type": "ccs-debug",
+            "request": "launch",
+            "targetConfig": "${workspaceFolder}/cpu1/targetConfigs/TMS320F28379D.ccxml",
+            "connections": [
+                {
+                    "name": "Texas Instruments XDS100v2 USB Debug Probe_0",
+                    "cores": [
+                        {
+                            "name": "C28xx_CPU1",
+                            "program": "${workspaceFolder}/cpu1/CPU1_FLASH_STANDALONE/labpsu_cpu1.out"
+                        },
+                        {
+                            "name": "C28xx_CPU2",
+                            "program": "${workspaceFolder}/cpu2/CPU2_FLASH/labpsu_cpu2.out"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
