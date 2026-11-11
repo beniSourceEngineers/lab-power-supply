@@ -22,9 +22,12 @@ Both cores also check that the channels are at the addresses from
 1. *File → Import Projects…*, select `test/target/`, then import
    `labpsu_ipc_test_cpu1` and `labpsu_ipc_test_cpu2` without copying them.
 2. Build both projects (configurations `CPU1_RAM` and `CPU2_RAM`).
-3. Start a debug session with `ipc_cpu1/targetConfigs/TMS320F28379D.ccxml`, load
+3. In the *Run and Debug* view, start `IPC test RAM (CPU1 + CPU2)`. It is
+   committed in `ipc_cpu1/.theia/launch.json` and `ipc_cpu2/.theia/launch.json`
+   (same content), uses `ipc_cpu1/targetConfigs/TMS320F28379D.ccxml`, and loads
    `labpsu_ipc_test_cpu1.out` on CPU1 and `labpsu_ipc_test_cpu2.out` on CPU2.
-   Reset both cores, then run both.
+   Reset both cores, then run both. See `ccs/README.md` (*Open in CCS*) if CCS
+   reports that `launch.json` is not valid.
 
 ### Result
 

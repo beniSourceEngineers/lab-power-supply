@@ -18,6 +18,7 @@ GPIO31, LED2 = GPIO34, on-board XDS100v2 probe).
 | `cpu1/src/`, `cpu2/src/` | `main.cpp` (composition root) and core-specific code |
 | `cpu1/cmd/`, `cpu2/cmd/` | Linker command files (from C2000Ware, owned by this repo) |
 | `cpu*/targetConfigs/` | Debug probe configuration (XDS100v2) |
+| `cpu*/.theia/launch.json` | Debug configurations: load both cores on the LaunchPad (RAM, FLASH, FLASH stand-alone); the same file in both projects |
 | `common/` | Code for both cores, linked into both projects as folder `common` |
 | `ext/c2000ware/` | C2000Ware copy; driverlib and `device.c` are linked in as folder `c2000ware` and built from source |
 
@@ -34,17 +35,41 @@ is ignored by git.
 3. Build each project (*Project → Build Project*). Pick the build configuration
    in the project's context menu.
 
+CCS adds every imported project as its own root folder, so the workspace is a
+multi-root workspace. CCS 20.0.1 then reads the debug configurations from
+`<project>/.theia/launch.json` of the selected project. If a project has no
+such file, CCS writes a `"launch"` block into the `.theia-workspace` file
+instead and later rejects that file with *'launch.json' is not a valid JSON
+file. Missing debug configuration properties.* Every project in this repo
+therefore has its own `.theia/launch.json`.
+
+If you see this error, close CCS, remove the `"launch"` block (and a top-level
+`"configurations"` entry, if present) from the workspace file in
+`~/.config/Texas Instruments/CCS/ccs2001/0/theia/workspaces/`, and start CCS
+again.
+
 ## Run on the LaunchPad
 
-- **RAM** (development): build `CPU1_RAM` and `CPU2_RAM`, start a debug session
-  with `cpu1/targetConfigs/TMS320F28379D.ccxml`, load `labpsu_cpu1.out` on
-  CPU1 and `labpsu_cpu2.out` on CPU2, run both. CPU1 configures the GPIOs and
-  hands LED2 to CPU2; both cores meet at `ipc::syncCores` (flag 31).
-- **Flash, with debugger**: `CPU1_FLASH` + `CPU2_FLASH`, load and run both
-  cores as above.
-- **Flash, stand-alone**: `CPU1_FLASH_STANDALONE` + `CPU2_FLASH`. CPU1 boots CPU2
-  from flash itself (`Device_bootCPU2`), so the board runs after power-up
-  without a debugger.
+The debug configurations are committed in `cpu1/.theia/launch.json` and
+`cpu2/.theia/launch.json` (same content, so it does not matter which project
+is selected). Each one
+connects through `cpu1/targetConfigs/TMS320F28379D.ccxml` (XDS100v2) and loads
+`labpsu_cpu1.out` on CPU1 and `labpsu_cpu2.out` on CPU2. Build both projects in
+the matching configurations first, then pick the configuration in the *Run and
+Debug* view and start it:
+
+| Debug configuration | CPU1 build | CPU2 build | Use |
+|---|---|---|---|
+| `LaunchPad RAM (CPU1 + CPU2)` | `CPU1_RAM` | `CPU2_RAM` | Development |
+| `LaunchPad FLASH (CPU1 + CPU2)` | `CPU1_FLASH` | `CPU2_FLASH` | Flash, with debugger |
+| `LaunchPad FLASH stand-alone (CPU1 + CPU2)` | `CPU1_FLASH_STANDALONE` | `CPU2_FLASH` | Flash, runs after power-up without a debugger |
+
+Run both cores. CPU1 configures the GPIOs and hands LED2 to CPU2; both cores
+meet at `ipc::syncCores` (flag 31). In the stand-alone build, CPU1 boots CPU2
+from flash itself (`Device_bootCPU2`).
+
+The launch files are shared: change them only for settings everyone needs,
+and keep both copies equal.
 
 Sign of life: LED1 (CPU1) toggles every 500 ms, LED2 (CPU2) every 250 ms, both
 from a 1 kHz CPU Timer 0 interrupt.
