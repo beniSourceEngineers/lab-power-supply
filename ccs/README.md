@@ -18,7 +18,7 @@ GPIO31, LED2 = GPIO34, on-board XDS100v2 probe).
 | `cpu1/src/`, `cpu2/src/` | `main.cpp` (composition root) and core-specific code |
 | `cpu1/src/hal/` | CPU1-only HAL: ADC, ePWM time base, power stage PWM, trip zone, CMPSS |
 | `cpu1/src/ctrl/` | Wrappers around the generated control loops: `ICurrentLoop`/`CurrentLoop`, `IVoltageLoop`/`VoltageLoop` (one model instance per object) |
-| `cpu1/src/app/` | CPU1 application: `IStateMachine`, open-loop task, scaling |
+| `cpu1/src/app/` | CPU1 application: `IStateMachine`, control task (cascade of the generated loops), scaling |
 | `cpu1/cmd/`, `cpu2/cmd/` | Linker command files (from C2000Ware, owned by this repo) |
 | `cpu*/targetConfigs/` | Debug probe configuration (XDS100v2) |
 | `cpu*/.theia/launch.json` | Debug configurations: load both cores on the LaunchPad (RAM, FLASH, FLASH stand-alone); the same file in both projects |
@@ -78,7 +78,7 @@ and keep both copies equal.
 Sign of life: LED1 (CPU1) toggles every 500 ms, LED2 (CPU2) every 250 ms, both
 from a 1 kHz CPU Timer 0 interrupt.
 
-## Power stage (CPU1, Phase 6)
+## Power stage and control (CPU1)
 
 Hardware path, taken over from Project A (`LabPSU_CPU01.slx`, `LabPsu_Pwm`):
 
@@ -87,32 +87,56 @@ Hardware path, taken over from Project A (`LabPSU_CPU01.slx`, `LabPsu_Pwm`):
 | Power stage PWM | ePWM4A/B on GPIO6/GPIO7 (LaunchPad pins 80/79) | 50 kHz up-down, TBPRD 1000, complementary, dead band 20 half cycles = 100 ns |
 | Current measurement | ADC-A SOC0, ADCINA0 (LaunchPad J3 pin 30) | triggered by ePWM4 SOCA at counter = period, every 5th period (10 kHz) |
 | Voltage measurement | ADC-B SOC0, ADCINB0 (not on a LaunchPad header) | triggered by ePWM5 SOCA, ePWM5 synced to ePWM4 with phase 50 counts |
-| Control ISR, 10 kHz | ADCB1 (end of the voltage conversion) | reads both results |
+| Current control ISR, 10 kHz | ADCA1, PIE 1.1 (end of the current conversion) | current loop → PWM duty |
+| Voltage control ISR, 10 kHz | ADCB1, PIE 1.2 (end of the voltage conversion) | voltage loop → current reference |
 | Off / Fault | ePWM4 one-shot trip, outputs forced low | tripped at start-up |
 
 Differences to Project A:
 
 - No HRPWM (and no SFO calibration) yet; the duty resolution is 1/1000.
-- One control ISR on ADCB1 instead of Project A's interrupt block. Project A
-  maps `CurrentControlTask` to PIE 1.3 (ADCC1), which no ADC raises, and
-  `VoltageControlTask` to PIE 1.1 (ADCA1); to be clarified in Phase 7.
+- Interrupt mapping: Project A maps `CurrentControlTask` to PIE 1.3 (ADCC1),
+  which no ADC raises, and `VoltageControlTask` to PIE 1.1 (ADCA1, the current
+  ADC). Project B runs each loop on the end-of-conversion interrupt of its own
+  ADC: current on ADCA1, voltage on ADCB1.
 - `hal::Cmpss` and `TripZone::enableDigitalCompareTrip()` are ready for a
   hardware over-limit trip, but not used: ADCINA0/ADCINB0 are no CMPSS inputs.
 - The measurement scaling (`raw / 4096 * 5`, as in Project A) is a placeholder.
 
-### Open loop on the LaunchPad
+### Control loops
+
+`app::ControlTask` runs the generated loops (through `ctrl::VoltageLoop` and
+`ctrl::CurrentLoop`) as a cascade, as in Project A:
+
+```
+voltageSetpoint ─► voltage loop (ADCB1 ISR) ─► current reference ─► current loop (ADCA1 ISR) ─► duty ─► ePWM4
+currentSetpoint ─┘ (used in constant current mode)
+```
+
+- Both ISRs are in PIE group 1 without nesting, so they never interrupt each
+  other. ADC A converts 0.5 us before ADC B, so the current ISR runs first and
+  uses the current reference of the previous period (one sample delay).
+- Mode 0 (constant voltage): the voltage loop output (0..15 A) is the current
+  reference. Mode 2 (constant current): the voltage loop passes
+  `currentSetpoint` through.
+- While the output is off, both loops are disabled and the duty is forced to
+  0; a disabled loop still outputs its P part.
+- The slew rates are 100 V/s and 100 A/s, as in Project A.
+
+### Run on the LaunchPad
 
 Load `CPU1_RAM` and `CPU2_RAM` (*LaunchPad RAM (CPU1 + CPU2)*), run both, then
-in the *Expressions* view:
+in the *Expressions* view (until the state machine and CPU2 provide them):
 
 | Expression | Use |
 |---|---|
-| `openLoopCommand.outputEnable` | 1 = clear the trip and drive the PWM, 0 = trip |
-| `openLoopCommand.duty` | duty cycle of ePWM4A, 0 .. 1 |
-| `openLoopStatus` | `outputEnabled`, `measurements`, `controlIsrCount` (10 kHz), `adcOverflowCount` |
+| `controlCommand.outputEnable` | 1 = clear the trip and enable the loops, 0 = trip |
+| `controlCommand.mode` | 0 = constant voltage, 2 = constant current |
+| `controlCommand.voltageSetpoint` | V |
+| `controlCommand.currentSetpoint` | A, constant current mode |
+| `controlStatus` | `outputEnabled`, `measurements`, `voltageLoop`/`currentLoop` outputs, ISR counts (10 kHz each), ADC overflow counts |
 
-`adcOverflowCount` counts up each time the debugger halts CPU1, because the
-ePWMs keep running (free run) and the ADC keeps converting. It must not grow
+The ADC overflow counts go up each time the debugger halts CPU1, because the
+ePWMs keep running (free run) and the ADCs keep converting. They must not grow
 while the CPU runs.
 
 ## Headless build
