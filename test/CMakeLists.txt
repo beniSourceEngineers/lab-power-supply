@@ -2,7 +2,7 @@
 #
 #   cmake -S test -B build/test && cmake --build build/test && ctest --test-dir build/test
 #
-# Three parts:
+# Four parts:
 #  - labpsu_control_generated: the generated control code (control/generated/),
 #    compiled as C. Its headers are SYSTEM includes: they use `long long`,
 #    which -pedantic rejects in C++03, and they must not be edited.
@@ -10,6 +10,7 @@
 #    -pedantic -Werror, to catch C++11 features that the C28x compiler rejects.
 #    Templates are instantiated in cxx03/, as they are only compiled when used.
 #  - labpsu_unit_tests: GoogleTest/GoogleMock unit tests (newer C++ allowed).
+#  - labpsu_integration_tests: several real classes, HAL mocked.
 cmake_minimum_required(VERSION 3.20)
 project(labpsu_host_tests C CXX)
 enable_testing()
@@ -45,7 +46,7 @@ add_library(labpsu_production_cxx03 STATIC
     ${CCS_DIR}/common/hal/GpioOutput.cpp
     ${CCS_DIR}/common/ipc/CommandLink.cpp
     ${CCS_DIR}/common/ipc/SyncCores.cpp
-    ${CCS_DIR}/cpu1/src/app/OpenLoopTask.cpp
+    ${CCS_DIR}/cpu1/src/app/ControlTask.cpp
     ${CCS_DIR}/cpu1/src/ctrl/CurrentLoop.cpp
     ${CCS_DIR}/cpu1/src/ctrl/VoltageLoop.cpp
     ${CCS_DIR}/cpu1/src/hal/Adc.cpp
@@ -72,6 +73,7 @@ add_executable(labpsu_unit_tests
     unit/BlinkerTest.cpp
     unit/CmpssTest.cpp
     unit/CommandLinkTest.cpp
+    unit/ControlTaskTest.cpp
     unit/CpuTimerTest.cpp
     unit/CtrlMocksTest.cpp
     unit/CurrentLoopTest.cpp
@@ -81,7 +83,6 @@ add_executable(labpsu_unit_tests
     unit/LinearScalingTest.cpp
     unit/MailboxStressTest.cpp
     unit/MailboxTest.cpp
-    unit/OpenLoopTaskTest.cpp
     unit/PowerStagePwmTest.cpp
     unit/QueueStressTest.cpp
     unit/QueueTest.cpp
@@ -94,5 +95,15 @@ target_compile_features(labpsu_unit_tests PRIVATE cxx_std_17)
 find_package(Threads REQUIRED)
 target_link_libraries(labpsu_unit_tests PRIVATE labpsu_production_cxx03 GTest::gmock_main Threads::Threads)
 
+# Integration tests: several real classes together, hardware mocked at the HAL
+# interfaces.
+add_executable(labpsu_integration_tests
+    integration/ControlTaskIntegrationTest.cpp
+)
+target_include_directories(labpsu_integration_tests PRIVATE fakes mocks)
+target_compile_features(labpsu_integration_tests PRIVATE cxx_std_17)
+target_link_libraries(labpsu_integration_tests PRIVATE labpsu_production_cxx03 GTest::gmock_main Threads::Threads)
+
 include(GoogleTest)
 gtest_discover_tests(labpsu_unit_tests)
+gtest_discover_tests(labpsu_integration_tests)
