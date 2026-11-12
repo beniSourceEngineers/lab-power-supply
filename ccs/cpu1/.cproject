@@ -44,6 +44,9 @@
                                     <listOptionValue value="${PROJECT_ROOT}"/>
                                     <listOptionValue value="${PROJECT_ROOT}/src"/>
                                     <listOptionValue value="${PROJECT_ROOT}/../common"/>
+                                    <listOptionValue value="${PROJECT_ROOT}/../../control/generated/shared"/>
+                                    <listOptionValue value="${PROJECT_ROOT}/../../control/generated/Current_Control"/>
+                                    <listOptionValue value="${PROJECT_ROOT}/../../control/generated/Voltage_Control"/>
                                     <listOptionValue value="${PROJECT_ROOT}/../ext/c2000ware/driverlib/f2837xd/driverlib"/>
                                     <listOptionValue value="${PROJECT_ROOT}/../ext/c2000ware/device_support/f2837xd/common/include"/>
                                     <listOptionValue value="${CG_TOOL_ROOT}/include"/>
@@ -128,6 +131,9 @@
                                     <listOptionValue value="${PROJECT_ROOT}"/>
                                     <listOptionValue value="${PROJECT_ROOT}/src"/>
                                     <listOptionValue value="${PROJECT_ROOT}/../common"/>
+                                    <listOptionValue value="${PROJECT_ROOT}/../../control/generated/shared"/>
+                                    <listOptionValue value="${PROJECT_ROOT}/../../control/generated/Current_Control"/>
+                                    <listOptionValue value="${PROJECT_ROOT}/../../control/generated/Voltage_Control"/>
                                     <listOptionValue value="${PROJECT_ROOT}/../ext/c2000ware/driverlib/f2837xd/driverlib"/>
                                     <listOptionValue value="${PROJECT_ROOT}/../ext/c2000ware/device_support/f2837xd/common/include"/>
                                     <listOptionValue value="${CG_TOOL_ROOT}/include"/>
@@ -213,6 +219,9 @@
                                     <listOptionValue value="${PROJECT_ROOT}"/>
                                     <listOptionValue value="${PROJECT_ROOT}/src"/>
                                     <listOptionValue value="${PROJECT_ROOT}/../common"/>
+                                    <listOptionValue value="${PROJECT_ROOT}/../../control/generated/shared"/>
+                                    <listOptionValue value="${PROJECT_ROOT}/../../control/generated/Current_Control"/>
+                                    <listOptionValue value="${PROJECT_ROOT}/../../control/generated/Voltage_Control"/>
                                     <listOptionValue value="${PROJECT_ROOT}/../ext/c2000ware/driverlib/f2837xd/driverlib"/>
                                     <listOptionValue value="${PROJECT_ROOT}/../ext/c2000ware/device_support/f2837xd/common/include"/>
                                     <listOptionValue value="${CG_TOOL_ROOT}/include"/>

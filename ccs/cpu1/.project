@@ -48,5 +48,10 @@
 			<type>1</type>
 			<locationURI>PARENT-1-PROJECT_LOC/ext/c2000ware/device_support/f2837xd/common/source/device.c</locationURI>
 		</link>
+		<link>
+			<name>control</name>
+			<type>2</type>
+			<locationURI>PARENT-2-PROJECT_LOC/control/generated</locationURI>
+		</link>
 	</linkedResources>
 </projectDescription>
