@@ -3,9 +3,9 @@
  *
  * Code generated for Simulink model 'Current_Control'.
  *
- * Model version                  : 1.14
- * Simulink Coder version         : 25.2 (R2025b) 28-Jul-2025
- * C/C++ source code generated on : Thu Oct 29 21:47:12 2026
+ * Model version                  : 3.0
+ * Simulink Coder version         : 26.2 (R2026b) 22-May-2026
+ * C/C++ source code generated on : Thu Nov 12 10:50:12 2026
  */
 
 #ifndef rt_defines_h_
