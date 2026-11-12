@@ -75,7 +75,7 @@ SECTIONS
 {
    /* Allocate program areas: */
    .cinit              : > FLASHB      PAGE = 0, ALIGN(8)
-   .text               : >> FLASHB | FLASHC | FLASHD | FLASHE      PAGE = 0, ALIGN(8)
+   .text               : >> FLASHC | FLASHD | FLASHE      PAGE = 0, ALIGN(8)   /* FLASHB stays free for .cinit, .switch, .init_array */
    codestart           : > BEGIN       PAGE = 0, ALIGN(8)
    /* Allocate uninitalized data sections: */
    .stack              : > RAMM1       PAGE = 1

@@ -500,8 +500,11 @@ Open:
 
 1. Simulink models: to be supplied, then Phase 1 starts.
 2. CANopen stack: vendor, license terms (may it be committed?), C2000 port.
-3. How the existing model is set up (protection inside the control models,
-   Stateflow chart, rates): to be checked when the models are supplied.
+3. Existing model (checked 2026-11-11, see `doc/state_machine.md`): there
+   is no Stateflow state machine and no protection logic yet. Both are new
+   models; their code is generated with MATLAB and committed to
+   `control/generated/` like the control loops. The interface of the state
+   machine is proposed in `doc/state_machine.md`.
 4. Plant models: existing ones to be supplied, or built in Phase 2a?
 
 ---
