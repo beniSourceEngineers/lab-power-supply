@@ -17,6 +17,7 @@ GPIO31, LED2 = GPIO34, on-board XDS100v2 probe).
 |---|---|
 | `cpu1/src/`, `cpu2/src/` | `main.cpp` (composition root) and core-specific code |
 | `cpu1/src/hal/` | CPU1-only HAL: ADC, ePWM time base, power stage PWM, trip zone, CMPSS |
+| `cpu1/src/ctrl/` | Wrappers around the generated control loops: `ICurrentLoop`/`CurrentLoop`, `IVoltageLoop`/`VoltageLoop` (one model instance per object) |
 | `cpu1/src/app/` | CPU1 application: `IStateMachine`, open-loop task, scaling |
 | `cpu1/cmd/`, `cpu2/cmd/` | Linker command files (from C2000Ware, owned by this repo) |
 | `cpu*/targetConfigs/` | Debug probe configuration (XDS100v2) |
