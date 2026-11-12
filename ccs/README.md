@@ -22,6 +22,7 @@ GPIO31, LED2 = GPIO34, on-board XDS100v2 probe).
 | `cpu*/targetConfigs/` | Debug probe configuration (XDS100v2) |
 | `cpu*/.theia/launch.json` | Debug configurations: load both cores on the LaunchPad (RAM, FLASH, FLASH stand-alone); the same file in both projects |
 | `common/` | Code for both cores, linked into both projects as folder `common` |
+| `../control/generated/` | Generated control code (`Current_Control`, `Voltage_Control`, `shared`), linked into `labpsu_cpu1` as folder `control` and built from source; its folders are on the CPU1 include path. Never edit; regenerate in MATLAB |
 | `ext/c2000ware/` | C2000Ware copy; driverlib and `device.c` are linked in as folder `c2000ware` and built from source |
 
 The project files (`.project`, `.cproject`, `.ccsproject`) are committed and
