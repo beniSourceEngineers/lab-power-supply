@@ -21,6 +21,8 @@ struct CurrentLoopInputs {
     bool enable;            // false: integrator reset, ramp restarts from 0
     float slewRateRise;     // A/s, limit for a rising setpoint (slewrate[0])
     float slewRateFall;     // A/s, limit for a falling setpoint (slewrate[1]), sign ignored
+    float dcLinkVoltage;    // V, DC link 1 (buck input) for the input-voltage feedforward:
+                            // output = PI output [V] / max(dcLinkVoltage, 10 V)
 };
 
 // Inputs of one voltage loop step (bus VoltageControl_in).

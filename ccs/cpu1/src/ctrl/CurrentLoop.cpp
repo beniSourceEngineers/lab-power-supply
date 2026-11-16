@@ -27,6 +27,7 @@ void CurrentLoop::step(const CurrentLoopInputs& in, ControlLoopOutputs& out)
     u.enable = in.enable ? 1U : 0U;
     u.slewrate[0] = in.slewRateRise;
     u.slewrate[1] = in.slewRateFall;
+    u.dcLinkVoltage = in.dcLinkVoltage;
 
     Current_Control_step(&model_, &inputs_, &outputs_);
 

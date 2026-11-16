@@ -22,7 +22,7 @@ typedef ctrl::VoltageLoopInputs::Mode Mode;
 
 // Scaling 1 count = 1 mV / 1 mA, so the plant works in physical units.
 const app::LinearScaling kScaling = { 0.001F, 0.0F };
-const app::ControlParameters kParameters = { 1000.0F, 1000.0F, 1000.0F, 1000.0F };
+const app::ControlParameters kParameters = { 1000.0F, 1000.0F, 1000.0F, 1000.0F, 24.0F };
 
 // Plant: the current follows the duty with a first-order lag (10 A at duty 1),
 // the output voltage is the current into a 4 ohm load.

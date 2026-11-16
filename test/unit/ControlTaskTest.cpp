@@ -66,7 +66,7 @@ protected:
 
 const app::LinearScaling ControlTaskTest::kVoltageScaling = { 0.01F, 0.0F };
 const app::LinearScaling ControlTaskTest::kCurrentScaling = { 0.001F, -1.0F };
-const app::ControlParameters ControlTaskTest::kParameters = { 10.0F, 20.0F, 30.0F, 40.0F };
+const app::ControlParameters ControlTaskTest::kParameters = { 10.0F, 20.0F, 30.0F, 40.0F, 350.0F };
 
 TEST_F(ControlTaskTest, VoltageStepMapsCommandAndMeasurementToVoltageLoop)
 {
@@ -99,7 +99,8 @@ TEST_F(ControlTaskTest, VoltageLoopOutputIsCurrentReference)
         Field(&ctrl::CurrentLoopInputs::measurement, FloatEq(2.0F)),
         Field(&ctrl::CurrentLoopInputs::enable, true),
         Field(&ctrl::CurrentLoopInputs::slewRateRise, 30.0F),
-        Field(&ctrl::CurrentLoopInputs::slewRateFall, 40.0F)), _));
+        Field(&ctrl::CurrentLoopInputs::slewRateFall, 40.0F),
+        Field(&ctrl::CurrentLoopInputs::dcLinkVoltage, 350.0F)), _));
     task.stepCurrentLoop();
 
     EXPECT_FLOAT_EQ(task.measurements().outputCurrent, 2.0F);

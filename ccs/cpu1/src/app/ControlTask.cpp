@@ -98,6 +98,7 @@ void ControlTask::stepCurrentLoop()
     in.enable = enabled;
     in.slewRateRise = parameters_.currentSlewRateRise;
     in.slewRateFall = parameters_.currentSlewRateFall;
+    in.dcLinkVoltage = parameters_.dcLinkVoltage;
     currentLoop_.step(in, currentLoopOutputs_);
 
     // A disabled loop still outputs its P part (ControlLoopTypes.hpp): gate it.

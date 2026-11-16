@@ -74,9 +74,12 @@ const app::LinearScaling kVoltageScaling = { 5.0F / 4096.0F, 0.0F };
 const app::LinearScaling kCurrentScaling = { 5.0F / 4096.0F, 0.0F };
 
 // Setpoint slew rates as in Project A (constants [100, -100] at both loops).
+// DC link 1 is not measured yet: the current loop feedforward uses the same
+// fixed value as Project A (CurrentControl_vdcDefault).
 const app::ControlParameters kControlParameters = {
     100.0F, 100.0F,     // voltage: V/s rise, fall
-    100.0F, 100.0F      // current: A/s rise, fall
+    100.0F, 100.0F,     // current: A/s rise, fall
+    24.0F               // DC link 1 voltage, V
 };
 
 hal::GpioOutput led1(DEVICE_GPIO_PIN_LED1);

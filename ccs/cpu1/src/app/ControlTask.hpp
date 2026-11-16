@@ -30,6 +30,9 @@ struct ControlParameters {
     float voltageSlewRateFall;  // V/s
     float currentSlewRateRise;  // A/s
     float currentSlewRateFall;  // A/s
+    // DC link 1 voltage for the feedforward of the current loop. Fixed value
+    // until DC link 1 is measured; replace it by the measurement then.
+    float dcLinkVoltage;        // V
 };
 
 // Cascaded control of the power stage with the generated control loops
