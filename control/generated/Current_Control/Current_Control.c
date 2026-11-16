@@ -3,9 +3,9 @@
  *
  * Code generated for Simulink model 'Current_Control'.
  *
- * Model version                  : 3.0
+ * Model version                  : 3.1
  * Simulink Coder version         : 26.2 (R2026b) 22-May-2026
- * C/C++ source code generated on : Thu Nov 12 10:50:12 2026
+ * C/C++ source code generated on : Mon Nov 16 16:11:04 2026
  *
  * Target selection: ert.tlc
  * Embedded hardware selection: Texas Instruments->C2000
@@ -30,9 +30,11 @@ void Current_Control_step(RT_MODEL_Current_Control_T *const Current_Control_M,
   real32_T rtb_IC1;
   real32_T rtb_UkYk1;
   real32_T rtb_lo;
-  int16_T tmp;
+  real32_T rtb_vdc;
+  real32_T tmp;
   int16_T tmp_0;
   int16_T tmp_1;
+  int16_T tmp_2;
   uint16_T rtb_Cast1;
 
   /* DataTypeConversion: '<Root>/Cast1' incorporates:
@@ -41,8 +43,8 @@ void Current_Control_step(RT_MODEL_Current_Control_T *const Current_Control_M,
   rtb_Cast1 = (uint16_T)(Current_Control_U->In1.enable == 0U);
 
   /* Delay: '<S61>/Enabled Delay' */
-  tmp_1 = (rtb_Cast1 > 0U);
-  if ((((Current_Control_PrevZCX->EnabledDelay_Reset_ZCE == POS_ZCSIG) != tmp_1)
+  tmp_2 = (rtb_Cast1 > 0U);
+  if ((((Current_Control_PrevZCX->EnabledDelay_Reset_ZCE == POS_ZCSIG) != tmp_2)
        && (Current_Control_PrevZCX->EnabledDelay_Reset_ZCE !=
            UNINITIALIZED_ZCSIG)) || (rtb_Cast1 != 0U)) {
     Current_Control_DW->EnabledDelay_DSTATE = 0.0F;
@@ -135,6 +137,25 @@ void Current_Control_step(RT_MODEL_Current_Control_T *const Current_Control_M,
    */
   Current_Control_Y->Out1.isAtSetpoint = (uint16_T)(fabsf(rtb_lo) <= 0.5F);
 
+  /* MinMax: '<Root>/Vdc guard'
+   *
+   * Block description for '<Root>/Vdc guard':
+   *  Guard against division by zero and a low DC link voltage: the
+   *  feedforward never divides by less than CurrentControl_vdcMin.
+   */
+  if (Current_Control_U->In1.dcLinkVoltage >= 10.0F) {
+    rtb_vdc = Current_Control_U->In1.dcLinkVoltage;
+  } else {
+    rtb_vdc = 10.0F;
+  }
+
+  /* End of MinMax: '<Root>/Vdc guard' */
+
+  /* Product: '<Root>/Upper limit V' incorporates:
+   *  Constant: '<Root>/Constant2'
+   */
+  rtb_UkYk1 = 0.95F * rtb_vdc;
+
   /* DiscreteIntegrator: '<S42>/Integrator' incorporates:
    *  Constant: '<Root>/Constant4'
    */
@@ -147,36 +168,46 @@ void Current_Control_step(RT_MODEL_Current_Control_T *const Current_Control_M,
    *  DiscreteIntegrator: '<S42>/Integrator'
    *  Gain: '<S47>/Proportional Gain'
    */
-  rtb_UkYk1 = 0.001F * rtb_lo + Current_Control_DW->Integrator_DSTATE;
+  rtb_IC1 = 0.024F * rtb_lo + Current_Control_DW->Integrator_DSTATE;
 
   /* Switch: '<S50>/Switch2' incorporates:
-   *  Constant: '<Root>/Constant2'
-   *  Constant: '<Root>/Constant3'
    *  RelationalOperator: '<S50>/LowerRelop1'
    *  RelationalOperator: '<S50>/UpperRelop'
    *  Switch: '<S50>/Switch'
    */
-  if (rtb_UkYk1 > 0.95F) {
+  if (rtb_IC1 > rtb_UkYk1) {
+    tmp = rtb_UkYk1;
+  } else if (rtb_IC1 < 0.0F) {
+    /* Switch: '<S50>/Switch' */
+    tmp = 0.0F;
+  } else {
+    tmp = rtb_IC1;
+  }
+
+  /* Product: '<Root>/Feedforward' incorporates:
+   *  Switch: '<S50>/Switch2'
+   *
+   * Block description for '<Root>/Feedforward':
+   *  Input-voltage feedforward: duty = PI output [V] / DC link voltage [V].
+   *  Rejects DC link 1 ripple (PFC line ripple) before the current loop
+   *  sees it.
+   */
+  rtb_vdc = tmp / rtb_vdc;
+
+  /* Saturate: '<Root>/Duty limit' */
+  if (rtb_vdc > 0.95F) {
     /* BusCreator generated from: '<Root>/Out1' incorporates:
      *  Outport: '<Root>/Out1'
      */
     Current_Control_Y->Out1.ctrlOut = 0.95F;
-  } else if (rtb_UkYk1 < 0.0F) {
-    /* Switch: '<S50>/Switch' incorporates:
-     *  BusCreator generated from: '<Root>/Out1'
-     *  Constant: '<Root>/Constant3'
-     *  Outport: '<Root>/Out1'
-     */
-    Current_Control_Y->Out1.ctrlOut = 0.0F;
   } else {
     /* BusCreator generated from: '<Root>/Out1' incorporates:
      *  Outport: '<Root>/Out1'
-     *  Switch: '<S50>/Switch'
      */
-    Current_Control_Y->Out1.ctrlOut = rtb_UkYk1;
+    Current_Control_Y->Out1.ctrlOut = rtb_vdc;
   }
 
-  /* End of Switch: '<S50>/Switch2' */
+  /* End of Saturate: '<Root>/Duty limit' */
 
   /* BusCreator generated from: '<Root>/Out1' incorporates:
    *  Delay: '<S61>/Enabled Delay'
@@ -186,28 +217,28 @@ void Current_Control_step(RT_MODEL_Current_Control_T *const Current_Control_M,
     Current_Control_DW->EnabledDelay_DSTATE;
 
   /* Switch: '<S34>/Switch' incorporates:
-   *  Constant: '<Root>/Constant2'
-   *  Constant: '<Root>/Constant3'
    *  RelationalOperator: '<S34>/u_GTE_up'
-   *  RelationalOperator: '<S34>/u_GT_lo'
-   *  Switch: '<S34>/Switch1'
    */
-  if (rtb_UkYk1 >= 0.95F) {
-    rtb_IC1 = 0.95F;
-  } else if (rtb_UkYk1 > 0.0F) {
-    /* Switch: '<S34>/Switch1' */
-    rtb_IC1 = rtb_UkYk1;
-  } else {
-    rtb_IC1 = 0.0F;
+  if (rtb_IC1 < rtb_UkYk1) {
+    /* Switch: '<S34>/Switch1' incorporates:
+     *  RelationalOperator: '<S34>/u_GT_lo'
+     */
+    if (rtb_IC1 > 0.0F) {
+      rtb_UkYk1 = rtb_IC1;
+    } else {
+      rtb_UkYk1 = 0.0F;
+    }
+
+    /* End of Switch: '<S34>/Switch1' */
   }
 
-  /* Sum: '<S34>/Diff' incorporates:
-   *  Switch: '<S34>/Switch'
-   */
-  rtb_UkYk1 -= rtb_IC1;
+  /* End of Switch: '<S34>/Switch' */
+
+  /* Sum: '<S34>/Diff' */
+  rtb_UkYk1 = rtb_IC1 - rtb_UkYk1;
 
   /* Gain: '<S39>/Integral Gain' */
-  rtb_lo *= 10.0F;
+  rtb_lo *= 240.0F;
 
   /* Update for DiscreteIntegrator: '<S42>/Integrator' incorporates:
    *  Constant: '<Root>/Constant1'
@@ -222,9 +253,9 @@ void Current_Control_step(RT_MODEL_Current_Control_T *const Current_Control_M,
      *  RelationalOperator: '<S31>/fix for DT propagation issue'
      */
     if (rtb_UkYk1 > 0.0F) {
-      tmp = 1;
+      tmp_0 = 1;
     } else {
-      tmp = -1;
+      tmp_0 = -1;
     }
 
     /* Switch: '<S31>/Switch2' incorporates:
@@ -234,9 +265,9 @@ void Current_Control_step(RT_MODEL_Current_Control_T *const Current_Control_M,
      *  RelationalOperator: '<S31>/fix for DT propagation issue1'
      */
     if (rtb_lo > 0.0F) {
-      tmp_0 = 1;
+      tmp_1 = 1;
     } else {
-      tmp_0 = -1;
+      tmp_1 = -1;
     }
 
     /* Switch: '<S31>/Switch' incorporates:
@@ -248,14 +279,14 @@ void Current_Control_step(RT_MODEL_Current_Control_T *const Current_Control_M,
      *  Switch: '<S31>/Switch1'
      *  Switch: '<S31>/Switch2'
      */
-    if ((rtb_UkYk1 != 0.0F) && (tmp == tmp_0)) {
+    if ((rtb_UkYk1 != 0.0F) && (tmp_0 == tmp_1)) {
       rtb_lo = 0.0F;
     }
 
     Current_Control_DW->Integrator_DSTATE += rtb_lo * 0.0001F;
   }
 
-  Current_Control_DW->Integrator_PrevResetState = tmp_1;
+  Current_Control_DW->Integrator_PrevResetState = tmp_2;
 
   /* End of Update for DiscreteIntegrator: '<S42>/Integrator' */
 }
