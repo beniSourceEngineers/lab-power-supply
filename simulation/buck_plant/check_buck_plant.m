@@ -17,7 +17,7 @@ function check_buck_plant()
     p = loadParams(fullfile(here, 'buck_plant_params.m'));
 
     Vin  = 400;
-    fsw  = 58e3;                          % Hz, switching frequency (ASSUMED, for the DCM check)
+    fsw  = 2*58e3;                        % Hz, buck switching frequency (Beni 2026-11-18)
     Vout = [100 150 200 250 300 400];
     Pout = [1 50 200 400];
     tStep = 0.02; tEnd = 0.04; dm = 0.01;
