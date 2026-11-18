@@ -85,7 +85,7 @@ epwm1.hrpwm_periodEnable                                         = true;
  * (phase 0, count up after sync), sync out on CTR=0 (drives ePWM5).
  * CMPA is written by the current loop (0 = output off). EPWM4B is the
  * complement of EPWM4A with 20-count rising/falling dead band (half-cycle
- * clocking -> 100 ns). SOCA on CTR=PRD triggers ADC A SOC0.
+ * clocking -> 100 ns). SOCA on every 5th CTR=PRD (10 kHz) triggers ADC A SOC0.
  * Pins: EPWM4A GPIO6 (J8-10, "80"), EPWM4B GPIO7 (J8-9, "79").
  */
 epwm2.$name                                                      = "POWER_STAGE_PWM";
@@ -119,7 +119,7 @@ epwm2.epwmDeadband_fedShadowLoadEvent                            = "EPWM_FED_LOA
 epwm2.epwmDeadband_deadbandCounterClockRate                      = "EPWM_DB_COUNTER_CLOCK_HALF_CYCLE";
 epwm2.epwmEventTrigger_EPWM_SOC_A_triggerEnable                  = true;
 epwm2.epwmEventTrigger_EPWM_SOC_A_triggerSource                  = "EPWM_SOC_TBCTR_PERIOD";
-epwm2.epwmEventTrigger_EPWM_SOC_A_triggerEventPrescalar          = "1";
+epwm2.epwmEventTrigger_EPWM_SOC_A_triggerEventPrescalar          = "5";
 epwm2.hrpwm_autoConv                                             = true;
 epwm2.hrpwm_edgeModeA                                            = "HRPWM_MEP_CTRL_RISING_AND_FALLING_EDGE";
 epwm2.hrpwm_edgeModeB                                            = "HRPWM_MEP_CTRL_RISING_AND_FALLING_EDGE";
@@ -131,7 +131,8 @@ epwm2.hrpwm_phaseLoadEnable                                      = true;
 /**
  * ePWM5: ADC trigger for the voltage loop. Up-down count, period 1000
  * (50 kHz), synced from ePWM4 with phase 50 (count down after sync), sync out
- * passes ePWM5 SYNCI through. SOCA on CTR=PRD triggers ADC B SOC0.
+ * passes ePWM5 SYNCI through. SOCA on every 5th CTR=PRD (10 kHz) triggers
+ * ADC B SOC0.
  * EPWM5A (GPIO8, J8-8, "78") is driven but stays low (CMPA 0).
  * Deviation from the target: the target leaves GPIO9 as a GPIO input. The
  * SysConfig ePWM pinmux has only the use case "ALL" (A and B), so GPIO9
@@ -158,7 +159,7 @@ epwm3.epwmActionQualifier_EPWM_AQ_OUTPUT_A_ON_TIMEBASE_UP_CMPA   = "EPWM_AQ_OUTP
 epwm3.epwmActionQualifier_EPWM_AQ_OUTPUT_A_ON_TIMEBASE_DOWN_CMPA = "EPWM_AQ_OUTPUT_HIGH";
 epwm3.epwmEventTrigger_EPWM_SOC_A_triggerEnable                  = true;
 epwm3.epwmEventTrigger_EPWM_SOC_A_triggerSource                  = "EPWM_SOC_TBCTR_PERIOD";
-epwm3.epwmEventTrigger_EPWM_SOC_A_triggerEventPrescalar          = "1";
+epwm3.epwmEventTrigger_EPWM_SOC_A_triggerEventPrescalar          = "5";
 
 /**
  * ADC A: current measurement. 12-bit single-ended, ADCCLK = SYSCLK/5 (40 MHz),

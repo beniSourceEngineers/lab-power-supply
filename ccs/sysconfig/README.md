@@ -63,10 +63,10 @@ To edit in the GUI, open the `.syscfg` files in CCS 20 (SysConfig editor). The
 | SYSCLK | 200 MHz (10 MHz crystal); not part of the scripts, set by `Device_init()` |
 | EPWMCLK | SYSCLK/2 = 100 MHz, TBCLK = EPWMCLK |
 | ePWM1 | up count, TBPRD 2000 → 50 kHz, CMPA 50, sync out disabled |
-| ePWM4 | up-down, TBPRD 1000 → 50 kHz, CMPA from the current loop, complementary B with 20-count RED/FED at half-cycle clocking (100 ns), SOCA at CTR=PRD, sync out at CTR=0 |
-| ePWM5 | up-down, TBPRD 1000 → 50 kHz, phase 50 after sync (count down), SOCA at CTR=PRD |
+| ePWM4 | up-down, TBPRD 1000 → 50 kHz, CMPA from the current loop, complementary B with 20-count RED/FED at half-cycle clocking (100 ns), SOCA at every 5th CTR=PRD (10 kHz), sync out at CTR=0 |
+| ePWM5 | up-down, TBPRD 1000 → 50 kHz, phase 50 after sync (count down), SOCA at every 5th CTR=PRD (10 kHz) |
 | ADC A/B | 12 bit single-ended, ADCCLK = SYSCLK/5 = 40 MHz, SOC0 = ADCIN0, sample window 15 |
-| Interrupts CPU1 | TIMER0 (1 ms base rate), ADCA1 (EOC0 of ADC A), IPC1 (setpoints from CPU2) |
+| Interrupts CPU1 | TIMER0 (1 ms base rate), ADCA1 (EOC0 of ADC A, 10 kHz), IPC1 (setpoints from CPU2) |
 | Interrupts CPU2 | TIMER0 (1 ms base rate), SCIA RX FIFO level 1 (INT9.1) |
 | SCIA | 115200 baud, 8N1, FIFO |
 
