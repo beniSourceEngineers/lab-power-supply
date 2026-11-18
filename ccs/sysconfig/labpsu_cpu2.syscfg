@@ -1,0 +1,58 @@
+/**
+ * LabPSU hardware setup, CPU2 (LAUNCHXL-F28379D, F28379DZWTT, 337ZWT).
+ *
+ * Mirrors the hardware configuration of Project A (simulink_full/LabPSU_CPU02.slx,
+ * configuration set CpuTwoTopLevel) as read back from the target on 2026-11-18.
+ * See ccs/sysconfig/README.md.
+ *
+ * CPU1 (labpsu_cpu1.syscfg) owns the pin mux and hands SCIA and GPIO34 to CPU2.
+ *
+ * @cliArgs --board "/boards/LAUNCHXL_F28379D" --device "F2837xD" --package "F2837xD_337ZWT" --part "F2837xD_337ZWT" --context "CPU2" --product "C2000WARE@5.02.00.00"
+ */
+
+/**
+ * Import the modules used in this configuration.
+ */
+const cputimer  = scripting.addModule("/driverlib/cputimer.js", {}, false);
+const cputimer1 = cputimer.addInstance();
+const ipc       = scripting.addModule("/driverlib/ipc.js");
+const sci       = scripting.addModule("/driverlib/sci.js", {}, false);
+const sci1      = sci.addInstance();
+
+/**
+ * CPU timer 0: model base rate 1 ms (Com_ipcTs, 200 MHz SYSCLK -> 200000 counts).
+ */
+cputimer1.$name                    = "BASE_RATE_TIMER";
+cputimer1.cputimerBase             = "CPUTIMER0_BASE";
+cputimer1.timerPeriod              = 199999;
+cputimer1.enableInterrupt          = true;
+cputimer1.registerInterrupts       = true;
+cputimer1.startTimer               = true;
+cputimer1.timerInt.enableInterrupt = true;
+
+/**
+ * SCIA: PC protocol (doc/sci_protocol.md). 115200 baud, 8N1, FIFO enabled,
+ * RX FIFO interrupt at level 1 -> INT_SCIA_RX (INT9.1). TX is polled.
+ * Pins: SCITXDA GPIO42, SCIRXDA GPIO43 -> XDS100v2 virtual COM port (CON1).
+ */
+sci1.$name                 = "PC_LINK";
+sci1.sci.$assign           = "SCIA";
+sci1.sci.scitxdPin.$assign = "GPIO42";
+sci1.sci.scirxdPin.$assign = "GPIO43";
+sci1.baudRates             = 115200;
+sci1.wordLenght            = "8";
+sci1.parity                = "SCI_CONFIG_PAR_NONE";
+sci1.stop                  = "ONE";
+sci1.useFifo               = true;
+sci1.rxFifo                = "SCI_FIFO_RX1";
+sci1.useInterrupts         = true;
+sci1.enabledFIFOInterrupts = ["SCI_INT_RXFF"];
+sci1.registerInterrupts    = true;
+sci1.sciRXInt.enableInterrupt = true;
+
+/**
+ * IPC: CPU2 posts setpoints (com2ctrl) to CPU1 and wakes it through IPC1
+ * (registered on CPU1). Measurements from CPU1 are polled every 1 ms.
+ */
+ipc.ipcRegisterFlag  = ["IPC_FLAG1"];
+ipc.enableInterrupt1 = true;
