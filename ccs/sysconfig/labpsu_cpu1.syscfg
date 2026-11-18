@@ -1,0 +1,223 @@
+/**
+ * LabPSU hardware setup, CPU1 (LAUNCHXL-F28379D, F28379DZWTT, 337ZWT).
+ *
+ * Mirrors the hardware configuration of Project A (simulink_full/LabPSU_CPU01.slx,
+ * control/subsystems/LabPsu_Pwm.slx, configuration set CpuOneTopLevel) as read back
+ * from the target on 2026-11-18. See ccs/sysconfig/README.md.
+ *
+ * @cliArgs --board "/boards/LAUNCHXL_F28379D" --device "F2837xD" --package "F2837xD_337ZWT" --part "F2837xD_337ZWT" --context "CPU1" --product "C2000WARE@5.02.00.00"
+ */
+
+/**
+ * Import the modules used in this configuration.
+ */
+const adc      = scripting.addModule("/driverlib/adc.js", {}, false);
+const adc1     = adc.addInstance();
+const adc2     = adc.addInstance();
+const cputimer = scripting.addModule("/driverlib/cputimer.js", {}, false);
+const cputimer1 = cputimer.addInstance();
+const epwm     = scripting.addModule("/driverlib/epwm.js", {}, false);
+const epwm1    = epwm.addInstance();
+const epwm2    = epwm.addInstance();
+const epwm3    = epwm.addInstance();
+const gpio     = scripting.addModule("/driverlib/gpio.js", {}, false);
+const gpio1    = gpio.addInstance();
+const gpio2    = gpio.addInstance();
+const ipc      = scripting.addModule("/driverlib/ipc.js");
+const sysctl   = scripting.addModule("/driverlib/sysctl.js");
+
+/**
+ * System: SCIA (CPU2 communication, GPIO42/43) belongs to CPU2. TBCLKSYNC is
+ * enabled after all ePWMs are configured so the time bases start together.
+ */
+sysctl.cpuSel_SCIA                        = "SYSCTL_CPUSEL_CPU2";
+sysctl.enable_SYSCTL_PERIPH_CLK_TBCLKSYNC = true;
+
+/**
+ * CPU timer 0: model base rate 1 ms (200 MHz SYSCLK -> 200000 counts).
+ */
+cputimer1.$name        = "BASE_RATE_TIMER";
+cputimer1.cputimerBase = "CPUTIMER0_BASE";
+cputimer1.timerPeriod  = 199999;
+cputimer1.enableInterrupt = true;
+cputimer1.registerInterrupts = true;
+cputimer1.startTimer   = true;
+cputimer1.timerInt.enableInterrupt = true;
+
+/**
+ * ePWM1: clock source for the high-resolution PWM. Up count, 100 MHz TBCLK,
+ * period 2000 (50 kHz), CMPA 50, sync out disabled.
+ * Pins: EPWM1A GPIO0 (J4-10, "40"), EPWM1B GPIO1 (J4-9, "39").
+ */
+epwm1.$name                                                      = "HRPWM_CLOCK_SOURCE";
+// hrpwm_enable must come before the $assign lines: enabling it clears earlier assignments.
+epwm1.hrpwm_enable                                               = true;
+epwm1.epwm.$assign                                               = "EPWM1";
+epwm1.epwm.epwm_aPin.$assign                                     = "GPIO0";
+epwm1.epwm.epwm_bPin.$assign                                     = "GPIO1";
+epwm1.epwmTimebase_clockDiv                                      = "EPWM_CLOCK_DIVIDER_1";
+epwm1.epwmTimebase_hsClockDiv                                    = "EPWM_HSCLOCK_DIVIDER_1";
+epwm1.epwmTimebase_counterMode                                   = "EPWM_COUNTER_MODE_UP";
+epwm1.epwmTimebase_period                                        = 2000;
+epwm1.epwmTimebase_syncOutPulseMode                              = "EPWM_SYNC_OUT_PULSE_DISABLED";
+epwm1.epwmCounterCompare_cmpA                                    = 50;
+// Deviation from the target (CMPCTL = 0, load on CTR=0): SysConfig requires CMPA/CMPB
+// shadow load on CTR=PRD when high-resolution period control is enabled.
+epwm1.epwmCounterCompare_shadowLoadModeCMPA                      = "EPWM_COMP_LOAD_ON_CNTR_PERIOD";
+epwm1.epwmCounterCompare_shadowLoadModeCMPB                      = "EPWM_COMP_LOAD_ON_CNTR_PERIOD";
+epwm1.epwmActionQualifier_EPWM_AQ_OUTPUT_A_ON_TIMEBASE_ZERO      = "EPWM_AQ_OUTPUT_HIGH";
+epwm1.epwmActionQualifier_EPWM_AQ_OUTPUT_A_ON_TIMEBASE_PERIOD    = "EPWM_AQ_OUTPUT_LOW";
+epwm1.epwmActionQualifier_EPWM_AQ_OUTPUT_A_ON_TIMEBASE_UP_CMPA   = "EPWM_AQ_OUTPUT_LOW";
+epwm1.epwmActionQualifier_EPWM_AQ_OUTPUT_A_ON_TIMEBASE_DOWN_CMPA = "EPWM_AQ_OUTPUT_HIGH";
+epwm1.epwmActionQualifier_EPWM_AQ_OUTPUT_B_ON_TIMEBASE_ZERO      = "EPWM_AQ_OUTPUT_HIGH";
+epwm1.epwmActionQualifier_EPWM_AQ_OUTPUT_B_ON_TIMEBASE_PERIOD    = "EPWM_AQ_OUTPUT_LOW";
+epwm1.epwmActionQualifier_EPWM_AQ_OUTPUT_B_ON_TIMEBASE_UP_CMPB   = "EPWM_AQ_OUTPUT_LOW";
+epwm1.epwmActionQualifier_EPWM_AQ_OUTPUT_B_ON_TIMEBASE_DOWN_CMPB = "EPWM_AQ_OUTPUT_HIGH";
+epwm1.hrpwm_autoConv                                             = true;
+epwm1.hrpwm_edgeModeA                                            = "HRPWM_MEP_CTRL_RISING_AND_FALLING_EDGE";
+epwm1.hrpwm_edgeModeB                                            = "HRPWM_MEP_CTRL_RISING_AND_FALLING_EDGE";
+epwm1.hrpwm_HRLoadA                                              = "HRPWM_LOAD_ON_CNTR_PERIOD";
+epwm1.hrpwm_HRLoadB                                              = "HRPWM_LOAD_ON_CNTR_ZERO";
+epwm1.hrpwm_periodEnable                                         = true;
+
+/**
+ * ePWM4: power stage. Up-down count, period 1000 (50 kHz), phase load enabled
+ * (phase 0, count up after sync), sync out on CTR=0 (drives ePWM5).
+ * CMPA is written by the current loop (0 = output off). EPWM4B is the
+ * complement of EPWM4A with 20-count rising/falling dead band (half-cycle
+ * clocking -> 100 ns). SOCA on CTR=PRD triggers ADC A SOC0.
+ * Pins: EPWM4A GPIO6 (J8-10, "80"), EPWM4B GPIO7 (J8-9, "79").
+ */
+epwm2.$name                                                      = "POWER_STAGE_PWM";
+// hrpwm_enable must come before the $assign lines: enabling it clears earlier assignments.
+epwm2.hrpwm_enable                                               = true;
+epwm2.epwm.$assign                                               = "EPWM4";
+epwm2.epwm.epwm_aPin.$assign                                     = "GPIO6";
+epwm2.epwm.epwm_bPin.$assign                                     = "GPIO7";
+epwm2.epwmTimebase_clockDiv                                      = "EPWM_CLOCK_DIVIDER_1";
+epwm2.epwmTimebase_hsClockDiv                                    = "EPWM_HSCLOCK_DIVIDER_1";
+epwm2.epwmTimebase_counterMode                                   = "EPWM_COUNTER_MODE_UP_DOWN";
+epwm2.epwmTimebase_period                                        = 1000;
+epwm2.epwmTimebase_phaseEnable                                   = true;
+epwm2.epwmTimebase_phaseShift                                    = 0;
+epwm2.epwmTimebase_counterModeAfterSync                          = "EPWM_COUNT_MODE_UP_AFTER_SYNC";
+epwm2.epwmTimebase_syncOutPulseMode                              = "EPWM_SYNC_OUT_PULSE_ON_COUNTER_ZERO";
+epwm2.epwmCounterCompare_cmpA                                    = 0;
+epwm2.epwmCounterCompare_shadowLoadModeCMPA                      = "EPWM_COMP_LOAD_ON_CNTR_ZERO_PERIOD";
+epwm2.epwmCounterCompare_shadowLoadModeCMPB                      = "EPWM_COMP_LOAD_ON_CNTR_ZERO_PERIOD";
+epwm2.epwmActionQualifier_EPWM_AQ_OUTPUT_A_ON_TIMEBASE_UP_CMPA   = "EPWM_AQ_OUTPUT_LOW";
+epwm2.epwmActionQualifier_EPWM_AQ_OUTPUT_A_ON_TIMEBASE_DOWN_CMPA = "EPWM_AQ_OUTPUT_HIGH";
+epwm2.epwmDeadband_enableRED                                     = true;
+epwm2.epwmDeadband_enableFED                                     = true;
+epwm2.epwmDeadband_polarityFED                                   = "EPWM_DB_POLARITY_ACTIVE_LOW";
+epwm2.epwmDeadband_delayRED                                      = 20;
+epwm2.epwmDeadband_delayFED                                      = 20;
+epwm2.epwmDeadband_redShadowMode                                 = true;
+epwm2.epwmDeadband_redShadowLoadEvent                            = "EPWM_RED_LOAD_ON_CNTR_ZERO_PERIOD";
+epwm2.epwmDeadband_fedShadowMode                                 = true;
+epwm2.epwmDeadband_fedShadowLoadEvent                            = "EPWM_FED_LOAD_ON_CNTR_ZERO_PERIOD";
+epwm2.epwmDeadband_deadbandCounterClockRate                      = "EPWM_DB_COUNTER_CLOCK_HALF_CYCLE";
+epwm2.epwmEventTrigger_EPWM_SOC_A_triggerEnable                  = true;
+epwm2.epwmEventTrigger_EPWM_SOC_A_triggerSource                  = "EPWM_SOC_TBCTR_PERIOD";
+epwm2.epwmEventTrigger_EPWM_SOC_A_triggerEventPrescalar          = "1";
+epwm2.hrpwm_autoConv                                             = true;
+epwm2.hrpwm_edgeModeA                                            = "HRPWM_MEP_CTRL_RISING_AND_FALLING_EDGE";
+epwm2.hrpwm_edgeModeB                                            = "HRPWM_MEP_CTRL_RISING_AND_FALLING_EDGE";
+epwm2.hrpwm_HRLoadA                                              = "HRPWM_LOAD_ON_CNTR_ZERO_PERIOD";
+epwm2.hrpwm_HRLoadB                                              = "HRPWM_LOAD_ON_CNTR_ZERO_PERIOD";
+epwm2.hrpwm_periodEnable                                         = true;
+epwm2.hrpwm_phaseLoadEnable                                      = true;
+
+/**
+ * ePWM5: ADC trigger for the voltage loop. Up-down count, period 1000
+ * (50 kHz), synced from ePWM4 with phase 50 (count down after sync), sync out
+ * passes ePWM5 SYNCI through. SOCA on CTR=PRD triggers ADC B SOC0.
+ * EPWM5A (GPIO8, J8-8, "78") is driven but stays low (CMPA 0).
+ * Deviation from the target: the target leaves GPIO9 as a GPIO input. The
+ * SysConfig ePWM pinmux has only the use case "ALL" (A and B), so GPIO9
+ * (J8-7, "77") is muxed to EPWM5B here; with no B actions it stays low.
+ * Count direction after sync (down) and sync out (SYNCI pass-through) are the
+ * reset values, so board.c does not write them.
+ */
+epwm3.$name                                                      = "VOLTAGE_ADC_TRIGGER";
+epwm3.epwm.$assign                                               = "EPWM5";
+epwm3.epwm.epwm_aPin.$assign                                     = "GPIO8";
+epwm3.epwm.epwm_bPin.$assign                                     = "GPIO9";
+epwm3.epwmTimebase_clockDiv                                      = "EPWM_CLOCK_DIVIDER_1";
+epwm3.epwmTimebase_hsClockDiv                                    = "EPWM_HSCLOCK_DIVIDER_1";
+epwm3.epwmTimebase_counterMode                                   = "EPWM_COUNTER_MODE_UP_DOWN";
+epwm3.epwmTimebase_period                                        = 1000;
+epwm3.epwmTimebase_phaseEnable                                   = true;
+epwm3.epwmTimebase_phaseShift                                    = 50;
+epwm3.epwmTimebase_counterModeAfterSync                          = "EPWM_COUNT_MODE_DOWN_AFTER_SYNC";
+epwm3.epwmTimebase_syncOutPulseMode                              = "EPWM_SYNC_OUT_PULSE_ON_SOFTWARE";
+epwm3.epwmCounterCompare_cmpA                                    = 0;
+epwm3.epwmActionQualifier_EPWM_AQ_OUTPUT_A_ON_TIMEBASE_ZERO      = "EPWM_AQ_OUTPUT_HIGH";
+epwm3.epwmActionQualifier_EPWM_AQ_OUTPUT_A_ON_TIMEBASE_PERIOD    = "EPWM_AQ_OUTPUT_LOW";
+epwm3.epwmActionQualifier_EPWM_AQ_OUTPUT_A_ON_TIMEBASE_UP_CMPA   = "EPWM_AQ_OUTPUT_LOW";
+epwm3.epwmActionQualifier_EPWM_AQ_OUTPUT_A_ON_TIMEBASE_DOWN_CMPA = "EPWM_AQ_OUTPUT_HIGH";
+epwm3.epwmEventTrigger_EPWM_SOC_A_triggerEnable                  = true;
+epwm3.epwmEventTrigger_EPWM_SOC_A_triggerSource                  = "EPWM_SOC_TBCTR_PERIOD";
+epwm3.epwmEventTrigger_EPWM_SOC_A_triggerEventPrescalar          = "1";
+
+/**
+ * ADC A: current measurement. 12-bit single-ended, ADCCLK = SYSCLK/5 (40 MHz),
+ * SOC0 = ADCIN0 (ADCINA0) triggered by ePWM4 SOCA, sample window 15 cycles.
+ * ADCINT1 on EOC0, continuous mode, pulse at end of conversion -> INT_ADCA1
+ * (INT1.1).
+ */
+adc1.$name                   = "CURRENT_ADC";
+adc1.adcBase                 = "ADCA_BASE";
+adc1.adcClockPrescaler       = "ADC_CLK_DIV_5_0";
+adc1.adcResolutionMode       = "ADC_RESOLUTION_12BIT";
+adc1.adcSignalMode           = "ADC_MODE_SINGLE_ENDED";
+adc1.interruptPulseMode      = "ADC_PULSE_END_OF_CONV";
+adc1.enabledSOCs             = ["ADC_SOC_NUMBER0"];
+adc1.soc0Channel             = "ADC_CH_ADCIN0";
+adc1.soc0Trigger             = "ADC_TRIGGER_EPWM4_SOCA";
+adc1.soc0SampleWindow        = 15;
+adc1.enabledInts             = ["ADC_INT_NUMBER1"];
+adc1.enableInterrupt1        = true;
+adc1.interrupt1SOCSource     = "ADC_SOC_NUMBER0";
+adc1.enableInterrupt1ContinuousMode = true;
+adc1.registerInterrupts      = ["1"];
+adc1.adcInt1.enableInterrupt = true;
+
+/**
+ * ADC B: voltage measurement. Same as ADC A, SOC0 = ADCIN0 (ADCINB0) triggered
+ * by ePWM5 SOCA. No interrupt.
+ */
+adc2.$name                   = "VOLTAGE_ADC";
+adc2.adcBase                 = "ADCB_BASE";
+adc2.adcClockPrescaler       = "ADC_CLK_DIV_5_0";
+adc2.adcResolutionMode       = "ADC_RESOLUTION_12BIT";
+adc2.adcSignalMode           = "ADC_MODE_SINGLE_ENDED";
+adc2.interruptPulseMode      = "ADC_PULSE_END_OF_CONV";
+adc2.enabledSOCs             = ["ADC_SOC_NUMBER0"];
+adc2.soc0Channel             = "ADC_CH_ADCIN0";
+adc2.soc0Trigger             = "ADC_TRIGGER_EPWM5_SOCA";
+adc2.soc0SampleWindow        = 15;
+
+/**
+ * GPIO: LaunchPad LEDs (low active). LED D10 (red, GPIO31) toggled by CPU1,
+ * LED D9 (blue, GPIO34) toggled by CPU2.
+ */
+gpio1.$name             = "LED_RED_CPU1";
+gpio1.gpioPin.$assign   = "GPIO31";
+gpio1.direction         = "GPIO_DIR_MODE_OUT";
+gpio1.writeInitialValue = true;
+gpio1.initialValue      = 1;
+
+gpio2.$name             = "LED_BLUE_CPU2";
+gpio2.gpioPin.$assign   = "GPIO34";
+gpio2.direction         = "GPIO_DIR_MODE_OUT";
+gpio2.controllerCore    = "GPIO_CORE_CPU2";
+gpio2.writeInitialValue = true;
+gpio2.initialValue      = 1;
+
+/**
+ * IPC: CPU2 -> CPU1 setpoints (com2ctrl) wake CPU1 through IPC1 (INT1.14).
+ */
+ipc.registerInterrupts        = ["1"];
+ipc.ipcInt1.enableInterrupt   = true;
+ipc.bootModeSelect            = "FLASH";

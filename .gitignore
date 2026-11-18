@@ -54,3 +54,6 @@ test/target/**/.launches/
 
 # Host test build
 build/
+
+# SysConfig output (ccs/sysconfig/generate.sh)
+ccs/sysconfig/generated/
