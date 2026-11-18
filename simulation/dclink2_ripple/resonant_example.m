@@ -34,8 +34,13 @@ basePhase = [-1.49 1.25 2.22 -1.65 -1.52 1.78 0.11 0.98 -1.66 0.33]; % rad
 %% Resonant terms (no filter): R_k(s) = Kr*(s*cos(th) - w*sin(th))/(s^2 + 2*wc*s + w^2)
 % th = -angle of plant + delay at w, so that R_k*P is real and positive at w.
 % Biquad in z^-1, run as DF2T: y = b0*e + s1; s1 = b1*e - a1*y + s2; s2 = b2*e - a2*y
+% resA, resB, resC, resD: all biquads summed as one discrete state-space
+% system (states [s1; s2] per term), e.g. for a Discrete State-Space block.
+% bq(k): coefficients per term.
 nRes = numel(fRes);
 b = zeros(nRes, 3); a = zeros(nRes, 3); theta = zeros(1, nRes);
+resA = zeros(2*nRes); resB = zeros(2*nRes, 1); resC = zeros(1, 2*nRes); resD = 0;
+bq = struct('f', {}, 'theta', {}, 'b', {}, 'a', {});
 for k = 1:nRes
     w  = 2*pi*fRes(k); jw = 1j*w;
     P  = Vdc1/(L*C*jw^2 + (L/Rnom + RL*C)*jw + 1 + RL/Rnom) * exp(-jw*1.5*Ts);
@@ -45,6 +50,13 @@ for k = 1:nRes
     b(k, :) = Kr(k)*[K*cos(th) - w*sin(th), -2*w*sin(th), -K*cos(th) - w*sin(th)]/a0;
     a(k, :) = [1, (2*w^2 - 2*K^2)/a0, (K^2 - 2*wc*K + w^2)/a0];
     theta(k) = th;
+
+    idx = 2*k-1:2*k;
+    resA(idx, idx) = [-a(k, 2) 1; -a(k, 3) 0];
+    resB(idx)      = [b(k, 2) - a(k, 2)*b(k, 1); b(k, 3) - a(k, 3)*b(k, 1)];
+    resC(idx)      = [1 0];
+    resD           = resD + b(k, 1);
+    bq(k) = struct('f', fRes(k), 'theta', th, 'b', b(k, :), 'a', a(k, :));
 end
 
 fprintf('Ki*Ts = %.9eF\n', Ki*Ts);
@@ -56,10 +68,7 @@ end
 
 %% Stability and sensitivity over load and tolerances (Control System Toolbox)
 z = tf('z', Ts); s = tf('s');
-Cz = ss(Ki*Ts*z/(z - 1));
-for k = 1:nRes
-    Cz = Cz + ss(tf(b(k, :), a(k, :), Ts, 'Variable', 'z^-1'));
-end
+Cz = ss(Ki*Ts*z/(z - 1)) + ss(resA, resB, resC, resD, Ts);
 plantOf = @(R, kL, kC) absorbDelay(setfield(c2d(ss(Vdc1/(L*kL*C*kC*s^2 + (L*kL/R + RL*C*kC)*s + 1 + RL/R)), ...
     Ts, 'zoh'), 'InputDelay', 1)); %#ok<SFLD>
 fgrid = logspace(0, log10(0.999/(2*Ts)), 5000);
