@@ -1,5 +1,5 @@
 function build_buck_plant()
-%BUILD_BUCK_PLANT Create buck_plant.slx: averaged buck with runtime Vin.
+%BUILD_BUCK_PLANT Create buck_plant.slx: discrete averaged buck with runtime Vin.
 %
 %   Inports  1 m      modulation index (duty cycle), 0..1
 %            2 Vin    DC link 1 voltage (V), may vary at runtime (ripple)
@@ -15,6 +15,9 @@ function build_buck_plant()
 %       Vin*Rload/((Rload*L*C)*s^2 + (L + Rload*Rseries*C)*s + Rload + Rseries).
 %   The load is a conductance Pout/Vout^2 computed at runtime, so Vout and
 %   Pout can also change during a simulation (load steps).
+%   Discrete: one Discrete State-Space block (exact ZOH at TsPlant, states
+%   [iL; vC; vMeas]); the load current is fed back from vC(k), which adds a
+%   one-sample delay in the load path (error checked by check_buck_plant.m).
 %   Parameters: buck_plant_params.m (model workspace). Usable stand-alone or
 %   in a Model block.
 
@@ -26,7 +29,8 @@ function build_buck_plant()
 
     new_system(model);
     cleanup = onCleanup(@() close_system(model, 0));
-    set_param(model, 'Solver', 'ode23tb', 'StopTime', '0.1', 'MaxStep', '1e-5', 'RelTol', '1e-6');
+    set_param(model, 'SolverType', 'Fixed-step', 'Solver', 'FixedStepDiscrete', 'FixedStep', 'TsPlant', ...
+        'StopTime', '0.1');
 
     mw = get_param(model, 'ModelWorkspace');
     mw.DataSource = 'MATLAB File';
@@ -56,13 +60,12 @@ function build_buck_plant()
     b('simulink/Math Operations/Product', 'iLoad', [330 170 360 220], 'Inputs', '**');
 
     b('simulink/Signal Routing/Mux', 'Mux', [400 70 405 160], 'Inputs', '2');
-    b('simulink/Continuous/State-Space', 'LC', [440 95 560 135], ...
-        'A', '[-Rseries/L, -1/L; 1/C, 0]', 'B', '[1/L, 0; 0, -1/C]', 'C', 'eye(2)', 'D', 'zeros(2)', ...
-        'InitialCondition', '[iL0; vC0]');
-    set_param([model '/LC'], 'Description', 'x = [iL; vC], u = [m*Vin; iLoad]');
-    b('simulink/Signal Routing/Demux', 'Demux', [590 95 595 135], 'Outputs', '2');
-    b('simulink/Continuous/Transfer Fcn', 'RC filter', [640 165 760 195], ...
-        'Numerator', '1', 'Denominator', '[Rfilt_1*Cfilt_1, 1]');
+    b('simulink/Discrete/Discrete State-Space', 'LC + RC filter', [440 95 560 135], ...
+        'A', 'Ad', 'B', 'Bd', 'C', 'Cd', 'D', 'Dd', 'InitialCondition', '[iL0; vC0; vC0]', ...
+        'SampleTime', 'TsPlant');
+    set_param([model '/LC + RC filter'], 'Description', ...
+        'x = [iL; vC; vMeas], u = [m*Vin; iLoad], exact ZOH at TsPlant (buck_plant_params.m)');
+    b('simulink/Signal Routing/Demux', 'Demux', [590 95 595 155], 'Outputs', '3');
 
     b('simulink/Sinks/Out1', 'vout',     [820 113 850 127], 'Port', '1');
     b('simulink/Sinks/Out1', 'voutMeas', [820 173 850 187], 'Port', '2');
@@ -78,16 +81,15 @@ function build_buck_plant()
     l('Gload/1', 'iLoad/2');
     l('Demux/2', 'iLoad/1');
     l('iLoad/1', 'Mux/2');
-    l('Mux/1', 'LC/1');
-    l('LC/1', 'Demux/1');
+    l('Mux/1', 'LC + RC filter/1');
+    l('LC + RC filter/1', 'Demux/1');
     l('Demux/1', 'iL/1');
     l('Demux/2', 'vout/1');
-    l('Demux/2', 'RC filter/1');
-    l('RC filter/1', 'voutMeas/1');
+    l('Demux/3', 'voutMeas/1');
 
     a = Simulink.Annotation([model '/note']);
     a.Text = sprintf(['Averaged buck (CCM). Vin can vary at runtime (DC link 1 ripple).\n' ...
-        'Load: Rload = Vout^2/Pout from the operating-point inputs. Parameters: buck_plant_params.m']);
+        'Discrete state space at TsPlant. Load: Rload = Vout^2/Pout from the inputs. Parameters: buck_plant_params.m']);
     a.Position = [40 320 700 360];
 
     save_system(model, file);

@@ -2,8 +2,10 @@ function check_buck_plant()
 %CHECK_BUCK_PLANT Verify buck_plant.slx against the transfer function and demo Vin ripple.
 %
 %   1. For every operating point Vout x Pout (constant Vin = 400 V): steady
-%      state and the response to a small step in m compared with
-%          Vin*Rload/((Rload*L*C)*s^2 + (L + Rload*Rseries*C)*s + Rload + Rseries),
+%      state and the response to a small step in m compared, at the sample
+%      instants, with the exact ZOH discretisation of
+%          Vin*Rload/((Rload*L*C)*s^2 + (L + Rload*Rseries*C)*s + Rload + Rseries)
+%      (the difference is the one-sample delay of the load feedback),
 %      plus a DCM check (Lcrit = Rload*(1 - m)/(2*fsw) must be below L).
 %   2. Demo: Vin with the DC link 1 harmonics from the scope photo, constant m.
 %   Plots: <tempdir>/check_buck_plant*.png. Base MATLAB + Simulink.
@@ -20,9 +22,10 @@ function check_buck_plant()
     fsw  = 2*58e3;                        % Hz, buck switching frequency (Beni 2026-11-18)
     Vout = [100 150 200 250 300 400];
     Pout = [1 50 200 400];
-    tStep = 0.02; tEnd = 0.04; dm = 0.01;
+    Ts = p.TsPlant;
+    tStep = round(0.02/Ts)*Ts; tEnd = 0.04; dm = 0.01;
 
-    fprintf('%6s %6s %8s %7s %9s %9s %12s %s\n', 'Vout', 'Pout', 'Rload', 'm0', 'Lcrit', 'vout ss', 'step error', 'note');
+    fprintf('%6s %6s %8s %7s %9s %9s %12s %s\n', 'Vout', 'Pout', 'Rload', 'm0', 'Lcrit', 'vout ss', 'step err', 'note');
     fig = figure('Visible', 'off', 'Position', [100 100 1100 700]); tiledlayout(fig, 'flow');
     for i = 1:numel(Vout)
         for j = 1:numel(Pout)
@@ -37,7 +40,7 @@ function check_buck_plant()
             end
             if Lcrit > p.L, note = sprintf('DCM (Lcrit %.0f uH > L): model not valid', 1e6*Lcrit); end
 
-            t  = (0:1e-5:tEnd)';
+            t  = (0:Ts:tEnd)';
             m  = m0 + dm*(t >= tStep);
             in = Simulink.SimulationInput(model);
             in = in.setModelParameter('StopTime', num2str(tEnd), 'LoadExternalInput', 'on', ...
@@ -50,34 +53,34 @@ function check_buck_plant()
             in = in.setVariable('vC0', Vout(i), 'Workspace', model);
             in = in.setVariable('iL0', Vout(i)/R, 'Workspace', model);
             out = sim(in);
-            y = interp1(out.tout, out.yout(:, 1), t);
+            y = interp1(out.tout, out.yout(:, 1), t, 'nearest');
 
             % Transfer function step response (base MATLAB: exact ZOH of the state model)
             A = [-p.Rseries/p.L, -1/p.L; 1/p.C, -1/(R*p.C)];
             B = [Vin/p.L; 0];
-            dt = t(2) - t(1); Ad = expm(A*dt); Bd = A\((Ad - eye(2))*B);
+            Ad = expm(A*Ts); Bd = A\((Ad - eye(2))*B);
             x = zeros(2, 1); yTf = zeros(size(t));
             for k = 1:numel(t)
                 yTf(k) = x(2); x = Ad*x + Bd*(m(k) - m0);
             end
             yTf = Vout(i) + yTf;
-            err = max(abs(y(t > tStep) - yTf(t > tStep)));
-            fprintf('%6g %6g %8.1f %7.3f %7.0fuH %9.2f %10.2e V %s\n', Vout(i), Pout(j), R, m0, ...
-                1e6*Lcrit, y(find(t < tStep, 1, 'last')), err, note);
+            err = max(abs(y(t > tStep) - yTf(t > tStep)))/(dm*Vin);   % relative to the step size
+            fprintf('%6g %6g %8.1f %7.3f %7.0fuH %9.2f %10.2f %% %s\n', Vout(i), Pout(j), R, m0, ...
+                1e6*Lcrit, y(find(t < tStep, 1, 'last')), 100*err, note);
             if j == numel(Pout) || j == 1
-                nexttile; plot(1e3*t, y, 1e3*t, yTf, '--'); grid on; xlim(1e3*[tStep - 0.002, tEnd]);
+                nexttile; stairs(1e3*t, y); hold on; plot(1e3*t, yTf, 'o', 'MarkerSize', 3); grid on; xlim(1e3*[tStep - 0.002, tEnd]);
                 title(sprintf('%g V, %g W', Vout(i), Pout(j))); xlabel('t [ms]'); ylabel('vout [V]');
             end
         end
     end
     ax = findobj(fig, 'Type', 'axes');
-    legend(ax(1), {'buck\_plant.slx', 'transfer function'}, 'Location', 'southeast');
+    legend(ax(1), {'buck\_plant.slx (discrete)', 'transfer function, exact ZOH'}, 'Location', 'southeast');
     exportgraphics(fig, fullfile(tempdir, 'check_buck_plant_steps.png'), 'Resolution', 110); close(fig);
 
     %% Demo: Vin with the measured DC link 1 ripple, 300 V / 400 W, constant m
     ampNom    = [1.77 0.71 0.09 0.06 0.06 0.03 0.01 0.01 0.01 0.02];
     basePhase = [-1.49 1.25 2.22 -1.65 -1.52 1.78 0.11 0.98 -1.66 0.33];
-    t   = (0:1e-5:0.1)';
+    t   = (0:Ts:0.1)';
     vin = Vin + sum(ampNom .* sin(2*pi*50*t*(1:10) + basePhase), 2);
     R   = 300^2/400; m0 = 300*(R + p.Rseries)/(R*Vin);
     in = Simulink.SimulationInput(model);
@@ -105,5 +108,5 @@ end
 
 function p = loadParams(file)
     run(file);
-    p = struct('L', L, 'C', C, 'Rseries', Rseries);
+    p = struct('L', L, 'C', C, 'Rseries', Rseries, 'TsPlant', TsPlant);
 end
