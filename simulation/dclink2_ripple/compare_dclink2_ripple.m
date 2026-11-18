@@ -7,9 +7,10 @@ function results = compare_dclink2_ripple()
 %     - 3 kW with the grid at 49.8 Hz (resonant terms stay at 50 Hz multiples),
 %     - a load step 300 W -> 3 kW at t = 0.6 s (ripple spectrum changes too),
 %   each with three controllers:
-%     PI only           integral only, no resonant term, no notch
-%     previous          PI + resonant at 50 Hz (Kr 0.5), no notch
-%     new               PI + resonant terms at 50..300 Hz + LC notch (parameters)
+%     PI only           new Kp, Ki and low-pass, no resonant terms
+%     previous          Ki 0.3, notch, resonant terms (dclink2_previous_controller.m)
+%     new               Kp 1e-3, Ki 2, low-pass, resonant terms (parameters)
+%   all on the plant with RL from the parameters (100 mOhm).
 %   Steady state is evaluated over the last 0.4 s: peak-to-peak and RMS of the
 %   DC link 2 ripple, and its amplitude per harmonic. For the load step: the
 %   largest deviation from VbuckSet after the step and the RMS ripple in
@@ -24,12 +25,12 @@ function results = compare_dclink2_ripple()
     run(fullfile(here, 'dclink2_ripple_params.m'));
 
     % Controller variants: variables set in the model workspace.
-    [pA, pB, pC, pD] = dclink2_resonant_coeffs(fRes, 0.5, wc, Ts, L, C, RL, Rnom, Vdc1); %#ok<NODEF>
-    noNotch = {'notchNum', [1 0 0]; 'notchDen', [1 0 0]};
+    prev = dclink2_previous_controller(Ts, L, C, RL, Rnom, Vdc1); %#ok<NODEF>
     ctrl = struct( ...
-        'name', {'PI only', 'previous (50 Hz)', 'new (50..300 Hz + notch)'}, ...
-        'vars', {[{'resEnable', 0}; noNotch], ...
-                 [{'resA', pA; 'resB', pB; 'resC', pC; 'resD', pD}; noNotch], ...
+        'name', {'PI only (new Kp, Ki)', 'previous (Ki 0.3, notch)', 'new (Kp, Ki 2, low-pass)'}, ...
+        'vars', {{'resEnable', 0}, ...
+                 {'Kp', prev.Kp; 'Ki', prev.Ki; 'filtNum', prev.filtNum; 'filtDen', prev.filtDen; ...
+                  'resA', prev.resA; 'resB', prev.resB; 'resC', prev.resC; 'resD', prev.resD}, ...
                  cell(0, 2)});
 
     ops = struct( ...

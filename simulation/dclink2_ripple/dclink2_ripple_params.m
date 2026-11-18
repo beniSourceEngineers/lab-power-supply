@@ -15,7 +15,7 @@
 %% Power stage
 L      = 220e-6;        % H, buck inductor
 C      = 40e-6;         % F, DC link 2 capacitor
-RL     = 0.05;          % ohm, inductor + switch resistance (ASSUMED)
+RL     = 0.1;           % ohm, inductor + switch resistance (Beni 2026-11-17)
 Rnom   = 30;            % ohm, nominal load on DC link 2 (ASSUMED: 3 kW at 300 V)
 
 %% Control
@@ -38,26 +38,25 @@ Pnom = VbuckSet^2/Rnom;
 [ripAmp2, ripPh2]       = dclink1_ripple(VbuckSet^2/Rload2, Pnom);
 
 %% PI controller 2
-% Integral only: a P part excites the lightly damped LC resonance (1.7 kHz,
-% 5.7x below fCtrl); this Ki keeps the loop stable down to no load.
-Kp = 0;                 % 1/V
-Ki = 0.3;               % 1/(V s)
+% The LC filter resonates at 1/(2*pi*sqrt(L*C)) = 1.7 kHz, only 5.7x below
+% fCtrl. RL = 100 mOhm damps it to zeta = 0.02 at no load (peak 28 dB above
+% the DC gain), which alone does not allow a P part: Kp = 5e-5 is already
+% unstable at no load. The low-pass below takes the loop gain away from the
+% resonance and makes Kp = 1e-3 and a 7x faster integral possible
+% (design_dclink2_ripple.m).
+Kp = 1e-3;              % 1/V
+Ki = 2;                 % 1/(V s)
 
-%% Notch at the LC resonance, on the control error
-% The LC filter resonates at 1/(2*pi*sqrt(L*C)) = 1.7 kHz and is nearly
-% undamped at light load. The resonant terms add gain there (each has a 1/s
-% skirt), which pushes the sensitivity peak to 19 dB at no load. A wide notch
-% at the resonance brings it back below 6 dB over all loads and +-10 % L, C.
-%   N(s) = (s^2 + 2*zetaZ*wn*s + wn^2) / (s^2 + 2*zetaP*wn*s + wn^2)
-notchF     = 1600;      % Hz, slightly below the nominal 1.7 kHz (covers L, C +10 %)
-notchZetaZ = 0.15;
-notchZetaP = 0.7;
-[notchNum, notchDen] = dclink2_notch_coeffs(notchF, notchZetaZ, notchZetaP, Ts);
+%% Low-pass on the control error (in front of P, I and the resonant terms)
+%   F(s) = wf^2 / (s^2 + 2*zeta*wf*s + wf^2), Tustin prewarped at wf
+filtF    = 500;         % Hz
+filtZeta = 0.7;
+[filtNum, filtDen] = dclink2_lowpass_coeffs(filtF, filtZeta, Ts);
 
 %% Resonant terms at the harmonics of fRes, in parallel with the PI
 %   R_h(s) = Kr_h * (s*cos(th_h) - w_h*sin(th_h)) / (s^2 + 2*wc*s + w_h^2)
-% Gain Kr_h/(2*wc) at w_h. th_h compensates the phase of notch + plant +
-% delay at w_h (nominal load), which keeps the loop stable with many
+% Gain Kr_h/(2*wc) at w_h. th_h compensates the phase of low-pass + plant
+% + delay at w_h (nominal load), which keeps the loop stable with many
 % resonances.
 % Each term: Tustin, prewarped at w_h (peak stays exactly at h*fRes).
 fRes  = 50;                                   % Hz
@@ -68,7 +67,7 @@ resEnable    = 1;                             % 1: PI + resonant terms, 0: PI on
 resGainScale = 1;                             % multiplies all Kr (design checks)
 
 [resA, resB, resC, resD, resBiquads] = dclink2_resonant_coeffs( ...
-    resH*fRes, resKr, wc, Ts, L, C, RL, Rnom, Vdc1, notchF, notchZetaZ, notchZetaP);
+    resH*fRes, resKr, wc, Ts, L, C, RL, Rnom, Vdc1, filtNum, filtDen);
 
 %% Operating point (start in steady state at Rload1)
 iL0 = VbuckSet/Rload1;

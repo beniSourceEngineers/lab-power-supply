@@ -49,9 +49,9 @@ function build_dclink2_ripple()
     b('simulink/Discrete/Zero-Order Hold', 'ADC', [900 185 935 215], 'SampleTime', 'Ts');
     b('simulink/Math Operations/Sum', 'Error', [150 100 170 140], 'Inputs', '+-', 'IconShape', 'round');
 
-    %% Notch at the LC resonance, on the error
-    b('simulink/Discrete/Discrete Transfer Fcn', 'LC notch', [190 100 260 140], ...
-        'Numerator', 'notchNum', 'Denominator', 'notchDen', 'SampleTime', 'Ts');
+    %% Low-pass on the error (keeps the loop gain away from the LC resonance)
+    b('simulink/Discrete/Discrete Transfer Fcn', 'Low-pass', [190 100 260 140], ...
+        'Numerator', 'filtNum', 'Denominator', 'filtDen', 'SampleTime', 'Ts');
 
     %% PI controller 2
     b('simulink/Math Operations/Gain', 'Kp', [300 40 340 70], 'Gain', 'Kp');
@@ -97,10 +97,10 @@ function build_dclink2_ripple()
     l('Vdc1/1', 'DC link 1/2');
     l('VbuckSet/1', 'Error/1');
     l('ADC/1', 'Error/2');
-    l('Error/1', 'LC notch/1');
-    l('LC notch/1', 'Kp/1');
-    l('LC notch/1', 'Integral/1');
-    l('LC notch/1', 'Resonant enable/1');
+    l('Error/1', 'Low-pass/1');
+    l('Low-pass/1', 'Kp/1');
+    l('Low-pass/1', 'Integral/1');
+    l('Low-pass/1', 'Resonant enable/1');
     l('Resonant enable/1', 'Resonant terms/1');
     l('Kp/1', 'Sum m/1');
     l('Integral/1', 'Sum m/2');
@@ -127,7 +127,7 @@ function build_dclink2_ripple()
 
     a = Simulink.Annotation([model '/note']);
     a.Text = sprintf(['Standalone DC link 2 model. DC link 1 (not measured) carries harmonics of the grid\n' ...
-        'frequency (dclink1_ripple.m). PI controller 2: notch at the LC resonance, integral, resonant terms at resH.\n' ...
+        'frequency (dclink1_ripple.m). PI controller 2: low-pass on the error, P, I, resonant terms at resH.\n' ...
         'Parameters: dclink2_ripple_params.m (model workspace). resEnable = 0: PI only.']);
     a.Position = [40 470 760 520];
 

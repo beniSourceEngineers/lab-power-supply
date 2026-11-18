@@ -1,16 +1,16 @@
-function [A, B, Cm, D, bq] = dclink2_resonant_coeffs(f, Kr, wc, Ts, L, C, RL, R, Vdc1, fn, zetaZ, zetaP)
+function [A, B, Cm, D, bq] = dclink2_resonant_coeffs(f, Kr, wc, Ts, L, C, RL, R, Vdc1, filtNum, filtDen)
 %DCLINK2_RESONANT_COEFFS Discrete resonant terms for PI controller 2.
 %
-%   [A, B, Cm, D, bq] = dclink2_resonant_coeffs(f, Kr, wc, Ts, L, C, RL, R, Vdc1, fn, zetaZ, zetaP)
+%   [A, B, Cm, D, bq] = dclink2_resonant_coeffs(f, Kr, wc, Ts, L, C, RL, R, Vdc1, filtNum, filtDen)
 %   discretises, for every frequency f(k) (Hz),
 %
 %       R_k(s) = Kr(k) * (s*cos(th_k) - w_k*sin(th_k)) / (s^2 + 2*wc*s + w_k^2)
 %
 %   with Tustin prewarped at w_k = 2*pi*f(k). th_k = -angle(Gd(j*w_k)) is the
 %   phase of the plant m -> vdc2 (buck LC with load R, input Vdc1) including
-%   the loop delay of 1.5*Ts (1 sample computation + ZOH) and the notch at fn
-%   (zetaZ, zetaP; omit them for no notch), so that R_k*N*Gd is real and
-%   positive at w_k.
+%   the loop delay of 1.5*Ts (1 sample computation + ZOH) and the discrete
+%   filter filtNum/filtDen (in z^-1) on the error (omit for none), so that
+%   R_k*F*Gd is real and positive at w_k.
 %
 %   bq(k) holds the biquad coefficients of R_k as the firmware runs them
 %   (direct form II transposed):
@@ -28,9 +28,9 @@ function [A, B, Cm, D, bq] = dclink2_resonant_coeffs(f, Kr, wc, Ts, L, C, RL, R,
         w  = 2*pi*f(k);
         jw = 1j*w;
         G  = Vdc1/(L*C*jw^2 + (L/R + RL*C)*jw + 1 + RL/R) * exp(-jw*1.5*Ts);
-        if nargin >= 12
-            wn = 2*pi*fn;
-            G  = G * (jw^2 + 2*zetaZ*wn*jw + wn^2)/(jw^2 + 2*zetaP*wn*jw + wn^2);
+        if nargin >= 11
+            zi = exp(-jw*Ts).^(0:numel(filtNum)-1);
+            G  = G * sum(filtNum.*zi)/sum(filtDen.*zi);
         end
         th = -angle(G);
 
